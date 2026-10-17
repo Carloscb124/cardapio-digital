@@ -12,7 +12,9 @@
     "test:api": "node test/smoke.js",
     "test:ui": "node test/ui-smoke.js",
     "test:signup": "node test/signup.js",
-    "test:ui-signup": "node test/ui-signup.js"
+    "test:ui-signup": "node test/ui-signup.js",
+    "test:customer": "node test/customer.js",
+    "test:ui-customer": "node test/ui-customer.js"
   },
   "engines": {
     "node": ">=18"

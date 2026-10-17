@@ -1,4 +1,5 @@
 let csrfToken = null;
+const resetCsrf = () => { csrfToken = null; };
 async function getCsrf() {
   if (!csrfToken) csrfToken = (await (await fetch('/api/csrf', { credentials: 'same-origin' })).json()).token;
   return csrfToken;

@@ -1,6 +1,7 @@
 const slug = location.pathname.split('/').filter(Boolean)[1] || '';
 const KEY = 'cart:' + slug;
-let menu, cart = [], current, coupon = { code: '', discount: 0 }, done = null;
+let menu, cart = [], current, coupon = { code: '', discount: 0 }, done = null, customer = null;
+const hook = (name, ...args) => (typeof window[name] === 'function' ? window[name](...args) : '');
 const DAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 try { const c = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(c)) cart = c.filter((i) => i && i.qty > 0 && Number.isFinite(i.unit)); } catch { /* sem armazenamento */ }
@@ -101,6 +102,7 @@ $('#pmAdd').onclick = () => {
 };
 
 function addToCart(item) {
+  done = null; // novo item depois de um pedido concluído: volta a mostrar o carrinho, não a confirmação antiga
   const key = JSON.stringify([item.kind, item.id, item.options.map((o) => o.id).sort(), item.notes]);
   const ex = cart.find((i) => i.key === key);
   if (ex) ex.qty = Math.min(99, ex.qty + item.qty); else cart.push({ ...item, key });
@@ -115,7 +117,7 @@ $('#list').addEventListener('click', (e) => {
 $('#search').addEventListener('input', renderList);
 
 /* ---------- Carrinho / checkout ---------- */
-let form = { type: '', neighborhood: '', address: '', name: '', phone: '', payment: '', change: '', notes: '' };
+let form = { type: '', neighborhood: '', address: '', name: '', phone: '', payment: '', change: '', notes: '', saveAddr: false, addrLabel: '' };
 const sheet = () => bootstrap.Offcanvas.getOrCreateInstance($('#cartSheet'));
 $('#openCart').onclick = () => { renderCart(); sheet().show(); };
 
@@ -146,8 +148,9 @@ function renderCart() {
       <div class="qty mt-1"><button type="button" data-m="${idx}">−</button><strong>${i.qty}</strong><button type="button" data-p="${idx}">+</button></div></div>
       <div class="text-end"><div class="price">${money(lineTotal(i))}</div><button type="button" class="btn btn-sm btn-link text-danger p-0" data-r="${idx}">remover</button></div></div>`).join('')}
     <div class="mt-3"><label class="form-label">Como deseja receber?</label><div class="btn-group w-100">${types.map((t) => `<input type="radio" class="btn-check" name="type" id="t_${t[0]}" value="${t[0]}" ${form.type === t[0] ? 'checked' : ''}><label class="btn btn-outline-success" for="t_${t[0]}">${t[1]}</label>`).join('')}</div></div>
-    ${form.type === 'entrega' ? `<div class="mt-3">${menu.zones.length ? `<label class="form-label" for="hood">Bairro</label><select class="form-select mb-2" id="hood"><option value="">Selecione...</option>${menu.zones.map((z) => `<option value="${esc(z.neighborhood)}" ${form.neighborhood === z.neighborhood ? 'selected' : ''}>${esc(z.neighborhood)} — ${money(z.fee)}</option>`).join('')}</select>` : ''}
-      <label class="form-label" for="addr">Endereço (rua, número, complemento)</label><input class="form-control" id="addr" maxlength="255" value="${esc(form.address)}"></div>` : (e.address ? `<div class="small text-muted mt-2">Retirar em: ${esc(e.address)}</div>` : '')}
+    ${form.type === 'entrega' ? `<div class="mt-3">${hook('addressPicker')}${menu.zones.length ? `<label class="form-label" for="hood">Bairro</label><select class="form-select mb-2" id="hood"><option value="">Selecione...</option>${menu.zones.map((z) => `<option value="${esc(z.neighborhood)}" ${form.neighborhood === z.neighborhood ? 'selected' : ''}>${esc(z.neighborhood)} — ${money(z.fee)}</option>`).join('')}</select>` : ''}
+      <label class="form-label" for="addr">Endereço (rua, número, complemento)</label><input class="form-control" id="addr" maxlength="255" value="${esc(form.address)}">${hook('saveAddressBox')}</div>` : (e.address ? `<div class="small text-muted mt-2">Retirar em: ${esc(e.address)}</div>` : '')}
+    <div class="mt-3">${hook('guestHint')}</div>
     <div class="row g-2 mt-1"><div class="col-12"><label class="form-label" for="cname">Seu nome</label><input class="form-control" id="cname" maxlength="100" value="${esc(form.name)}"></div>
       <div class="col-12"><label class="form-label" for="cphone">Telefone com DDD</label><input class="form-control" id="cphone" type="tel" maxlength="20" value="${esc(form.phone)}"></div></div>
     <div class="mt-3"><label class="form-label" for="pay">Forma de pagamento</label><select class="form-select" id="pay"><option value="">Selecione...</option>${pays.map((p) => `<option value="${p[0]}" ${form.payment === p[0] ? 'selected' : ''}>${p[1]}</option>`).join('')}</select></div>
@@ -167,6 +170,7 @@ function renderCart() {
 function readForm() {
   const g = (id) => ($(id) ? $(id).value : null);
   if ($('#addr')) form.address = g('#addr'); if ($('#hood')) form.neighborhood = g('#hood');
+  if ($('#saveAddr')) form.saveAddr = $('#saveAddr').checked; form.addrLabel = g('#addrLabel') ?? form.addrLabel;
   form.name = g('#cname') ?? form.name; form.phone = g('#cphone') ?? form.phone;
   form.payment = g('#pay') ?? form.payment; if ($('#chg')) form.change = g('#chg'); form.notes = g('#onotes') ?? form.notes;
 }
@@ -185,7 +189,8 @@ $('#cartBody').addEventListener('click', async (e) => {
 $('#cartBody').addEventListener('change', (e) => {
   readForm();
   if (e.target.name === 'type') form.type = e.target.value;
-  if (['type', 'hood', 'pay'].includes(e.target.name || e.target.id)) renderCart();
+  if (e.target.id === 'savedAddr') hook('pickSaved', e.target.value);
+  if (['type', 'hood', 'pay', 'savedAddr', 'saveAddr'].includes(e.target.name || e.target.id)) renderCart();
 });
 
 async function submit(btn) {
@@ -200,6 +205,7 @@ async function submit(btn) {
       payment_method: form.payment, change_for: change, notes: form.notes, coupon: coupon.code,
       items: cart.map((i) => ({ kind: i.kind, id: i.id, quantity: i.qty, options: i.options.map((o) => o.id), notes: i.notes })),
     } });
+    hook('afterOrder', done, { ...form });
     cart = []; coupon = { code: '', discount: 0 }; saveCart(); renderBar(); renderDone();
   } catch (e) {
     err.textContent = e.message; err.classList.remove('d-none'); err.scrollIntoView({ block: 'center' });
@@ -213,6 +219,7 @@ function renderDone() {
     ${done.whatsappUrl ? `<div class="alert alert-warning text-start mt-3">Falta um passo: o estabelecimento só recebe seu pedido quando você <strong>enviar a mensagem pelo WhatsApp</strong>.</div>
       <a class="btn btn-success btn-lg w-100" href="${esc(done.whatsappUrl)}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Abrir WhatsApp e enviar</a>`
     : `<div class="alert alert-warning text-start mt-3">Este estabelecimento ainda não configurou o WhatsApp. Entre em contato informando o número do pedido (#${done.number}).</div>`}
+    <a class="btn btn-outline-success w-100 mt-2" href="${esc(done.trackUrl)}"><i class="bi bi-geo-alt"></i> Acompanhar pedido</a>
     <button class="btn btn-link mt-3" id="newOrder">Fazer outro pedido</button></div>`;
   $('#newOrder').onclick = () => { done = null; sheet().hide(); };
 }

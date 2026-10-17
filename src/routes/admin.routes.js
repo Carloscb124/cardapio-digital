@@ -5,6 +5,7 @@ const makeService = require('../services/crud.service');
 const makeController = require('../controllers/crud.controller');
 const catalog = require('../controllers/catalog.controller');
 const admin = require('../controllers/admin.controller');
+const customers = require('../controllers/customer.controller');
 const { upload } = require('../config/upload');
 const { HttpError } = require('../utils/http');
 
@@ -52,6 +53,9 @@ router.get('/orders/counts', admin.orders.counts);
 router.get('/orders/:id', admin.orders.get);
 router.get('/orders/:id/ticket', staff, admin.orders.ticket);
 router.post('/orders/:id/status', admin.orders.status);
+
+router.get('/customers', staff, customers.adminList);
+router.post('/customers/:id/reset-link', adminOnly, customers.adminReset);
 
 router.get('/stock', adminOnly, admin.stock.list);
 router.post('/stock/adjust', adminOnly, admin.stock.adjust);

@@ -14,5 +14,7 @@ const mysql = require('mysql2/promise');
   await conn.query(`USE \`${name}\``);
   await conn.query(fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8'));
   await conn.end();
+  await require('../src/config/migrate')();
+  await require('../src/config/db').end();
   console.log(`Banco "${name}" pronto.`);
 })().catch((e) => { console.error('Falha:', e.message); process.exit(1); });

@@ -61,6 +61,7 @@ async function setStatus(est, id, next, role) {
       if (o.coupon_id) await conn.query('UPDATE coupons SET used_count=GREATEST(used_count-1,0) WHERE id=?', [o.coupon_id]);
     }
     await conn.query('UPDATE orders SET status=? WHERE id=?', [next, id]);
+    await conn.query('INSERT INTO order_status_history (order_id,status) VALUES (?,?)', [id, next]);
   });
 }
 

@@ -42,11 +42,13 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 app.use('/api/public', require('./routes/public.routes'));
 app.use('/api/signup', require('./routes/signup.routes'));
+app.use('/api/customer', require('./routes/customer.routes'));
 app.use('/api', require('./routes/admin.routes'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada.' }));
 
 const view = (f) => (req, res) => res.sendFile(path.join(__dirname, '..', 'views', f));
 app.get('/m/:slug', view('menu.html'));
+app.get('/pedido/:token', view('track.html'));
 app.get('/print/:id', (req, res, next) => (req.session.user && /^\d+$/.test(req.params.id) ? view('print.html')(req, res, next) : res.redirect('/login.html')));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), { maxAge: '7d' }));
 app.get('/admin', (req, res) => {

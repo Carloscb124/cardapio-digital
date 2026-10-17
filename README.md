@@ -28,6 +28,16 @@ Pedidos são **gravados no banco antes** de abrir o WhatsApp.
 - O servidor repete todas as regras: a validação do navegador é só conforto de uso.
 - Ainda **não há confirmação de e-mail** (exigiria SMTP) nem termos de uso. Antes de abrir cadastro ao público, inclua os termos e a política de privacidade revisados por quem entende do assunto.
 
+## Área do cliente
+- **Acompanhar pedido:** ao registrar o pedido, o cliente recebe um link secreto (`/pedido/<código>`) com a linha do tempo (registrado, confirmado, em preparação, pronto, saiu para entrega, concluído), horários de cada etapa e o resumo. A página atualiza sozinha a cada 10 s. Enquanto a loja não confirma, ela oferece reenviar o pedido pelo WhatsApp. A equipe copia o link no detalhe do pedido.
+- **Conta do cliente (por loja):** login com WhatsApp + senha (mín. 6). Dá histórico de pedidos, até 5 endereços salvos, checkout preenchido e "pedir de novo" (usa preços e disponibilidade atuais; itens indisponíveis são avisados). Só pedidos feitos com o cliente logado entram no histórico: ninguém vê pedidos de outro cliente só por saber o telefone.
+- **Esqueci a senha:** não há SMS/e-mail. No painel, em **Clientes**, o administrador gera um link de nova senha (1 hora, uso único) e envia pelo WhatsApp.
+- **Painel › Clientes:** quem já pediu, total gasto, último pedido e se tem conta.
+- Os links usam o endereço do site. Em `localhost` só funcionam no seu computador; para testar no celular, use o IP do PC na mesma rede Wi-Fi (ex.: `http://192.168.0.10:3000`) ou publique o sistema.
+
+## Atualizando um banco já existente
+Substitua os arquivos (mantenha `.env` e a pasta `uploads/`), rode `npm install` e `npm start`. As migrações (`src/migrations`) rodam sozinhas no início e são seguras para repetir; os pedidos antigos ganham link de acompanhamento.
+
 ## Perfis
 | Perfil | Acesso |
 |---|---|
@@ -64,8 +74,10 @@ npm run test:api
 npm run test:ui
 npm run test:signup
 npm run test:ui-signup
+npm run test:customer
+npm run test:ui-customer
 ```
-`test:signup` usa `BASE2` (opcional) para testar o limite de tentativas: suba um segundo servidor com `SIGNUP_RATE_LIMIT=3` e `PORT=3998`.
+Os testes de cadastro e de cliente aceitam `BASE2` (servidor com `SIGNUP_RATE_LIMIT=3` e `CUSTOMER_RATE_LIMIT=3`) para validar o limite de tentativas. `test:signup` usa `BASE2` (opcional) para testar o limite de tentativas: suba um segundo servidor com `SIGNUP_RATE_LIMIT=3` e `PORT=3998`.
 (use um banco de teste: os testes criam pedidos, usuários e alteram configurações da loja demo.)
 
 ## Antes de publicar na internet

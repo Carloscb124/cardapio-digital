@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const crypto = require('crypto');
 const tx = require('../utils/tx');
 const catalog = require('./catalog.service');
 const { isOpenNow } = require('./settings.service');
@@ -87,7 +88,13 @@ function whatsappText(o) {
   return L.join('\n');
 }
 
-async function createOrder(slug, b) {
+function waUrl(e, order) {
+  if (!e.whatsapp) return null;
+  const num = e.whatsapp.length <= 11 ? '55' + e.whatsapp : e.whatsapp;
+  return `https://wa.me/${num}?text=${encodeURIComponent(whatsappText(order))}`;
+}
+
+async function createOrder(slug, b, accountId = null) {
   const name = String(b.customer_name || '').trim();
   const phone = String(b.customer_phone || '').replace(/\D/g, '');
   const type = b.type, pay = b.payment_method;
@@ -122,7 +129,7 @@ async function createOrder(slug, b) {
         if (!c) throw new HttpError(400, 'Um combo do carrinho não está mais disponível.');
         const [parts] = await conn.query('SELECT product_id, quantity FROM combo_items WHERE combo_id=?', [c.id]);
         parts.forEach((x) => add(needP, x.product_id, x.quantity * qty));
-        lines.push({ product_id: null, name: `Combo: ${c.name}`, unit_price: c.price, quantity: qty, notes: note, options: [] });
+        lines.push({ combo_id: c.id, product_id: null, name: `Combo: ${c.name}`, unit_price: c.price, quantity: qty, notes: note, options: [] });
         subtotal += c.price * qty;
         continue;
       }
@@ -138,7 +145,7 @@ async function createOrder(slug, b) {
         if (n < g.min_select || n > g.max_select) throw new HttpError(400, `Em "${p.name}", escolha ${g.min_select === g.max_select ? g.min_select : `de ${g.min_select} a ${g.max_select}`} opção(ões) de "${g.name}".`);
       }
       add(needP, p.id, qty); opts.forEach((o) => add(needO, o.id, qty));
-      lines.push({ product_id: p.id, name: p.name, unit_price: unit, quantity: qty, notes: note, options: opts.map((o) => ({ id: o.id, name: o.name, price_delta: o.price_delta })) });
+      lines.push({ combo_id: null, product_id: p.id, name: p.name, unit_price: unit, quantity: qty, notes: note, options: opts.map((o) => ({ id: o.id, name: o.name, price_delta: o.price_delta })) });
       subtotal += (unit + opts.reduce((s, o) => s + o.price_delta, 0)) * qty;
     }
     subtotal = round2(subtotal);
@@ -180,14 +187,16 @@ async function createOrder(slug, b) {
       if (!Number.isFinite(change) || change < total) throw new HttpError(400, 'O valor para troco deve ser maior ou igual ao total do pedido.');
     }
 
+    const token = crypto.randomBytes(16).toString('hex');
     const [cr] = await conn.query('INSERT INTO customers (establishment_id,name,phone) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name), id=LAST_INSERT_ID(id)', [e.id, name, phone]);
     const [[{ n: number }]] = await conn.query('SELECT COALESCE(MAX(number),0)+1 AS n FROM orders WHERE establishment_id=?', [e.id]);
     const [or] = await conn.query(
-      `INSERT INTO orders (establishment_id,number,customer_id,customer_name,customer_phone,type,address,neighborhood,subtotal,delivery_fee,discount,total,coupon_id,payment_method,change_for,notes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [e.id, number, cr.insertId, name, phone, type, type === 'entrega' ? address : null, hood, subtotal, fee, discount, total, couponId, pay, change, notes]);
+      `INSERT INTO orders (establishment_id,number,customer_id,customer_name,customer_phone,type,address,neighborhood,subtotal,delivery_fee,discount,total,coupon_id,payment_method,change_for,notes,tracking_token,customer_account_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [e.id, number, cr.insertId, name, phone, type, type === 'entrega' ? address : null, hood, subtotal, fee, discount, total, couponId, pay, change, notes, token, accountId]);
+    await conn.query('INSERT INTO order_status_history (order_id,status) VALUES (?,?)', [or.insertId, 'aguardando']);
     for (const l of lines) {
-      const [ir] = await conn.query('INSERT INTO order_items (order_id,product_id,name,unit_price,quantity,notes) VALUES (?,?,?,?,?,?)', [or.insertId, l.product_id, l.name, l.unit_price, l.quantity, l.notes]);
+      const [ir] = await conn.query('INSERT INTO order_items (order_id,product_id,combo_id,name,unit_price,quantity,notes) VALUES (?,?,?,?,?,?,?)', [or.insertId, l.product_id, l.combo_id, l.name, l.unit_price, l.quantity, l.notes]);
       for (const o of l.options) await conn.query('INSERT INTO order_item_options (order_item_id,option_id,name,price_delta) VALUES (?,?,?,?)', [ir.insertId, o.id, o.name, o.price_delta]);
     }
     for (const [kind, id, qty] of stock) {
@@ -196,10 +205,8 @@ async function createOrder(slug, b) {
     }
 
     const order = { number, customer_name: name, customer_phone: phone, type, address, neighborhood: hood, subtotal, delivery_fee: fee, discount, total, payment_method: pay, change_for: change, notes, items: lines };
-    let wa = null;
-    if (e.whatsapp) { const num = e.whatsapp.length <= 11 ? '55' + e.whatsapp : e.whatsapp; wa = `https://wa.me/${num}?text=${encodeURIComponent(whatsappText(order))}`; }
-    return { id: or.insertId, number, total, whatsappUrl: wa };
+    return { id: or.insertId, number, total, whatsappUrl: waUrl(e, order), token, trackUrl: `/pedido/${token}` };
   });
 }
 
-module.exports = { getMenu, previewCoupon, createOrder };
+module.exports = { getMenu, previewCoupon, createOrder, whatsappText, waUrl };

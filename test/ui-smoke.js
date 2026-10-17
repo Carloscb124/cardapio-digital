@@ -35,7 +35,7 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
   /* ===== Cliente: cardápio público ===== */
   let jar = { c: '' };
   let w = makeWindow('views/menu.html', BASE + '/m/demo', jar);
-  w.run('public/js/api.js'); w.run('public/js/menu.js'); await sleep(600);
+  w.run('public/js/api.js'); w.run('public/js/br.js'); w.run('public/js/menu.js'); w.run('public/js/account.js'); await sleep(600);
   const $ = (s) => w.document.querySelector(s);
   ok('menu renderiza produtos', w.document.querySelectorAll('#list .prod').length >= 4, $('#list').textContent.slice(0, 100));
   ok('nome da loja', /Lanchonete Demo/.test($('#head').textContent));
@@ -69,12 +69,12 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
   w.run('public/js/api.js');
   await w.api('/api/auth/login', { method: 'POST', body: { email: 'admin@demo.local', password: process.env.ADMIN_PASS } });
   w.exec('csrfToken = null'); // a sessão foi renovada pelo login (no navegador a página recarrega)
-  w.run('public/js/admin-core.js'); w.run('public/js/admin-views.js'); await sleep(500);
+  w.run('public/js/br.js'); w.run('public/js/admin-core.js'); w.run('public/js/admin-views.js'); await sleep(500);
   const V = () => w.document.querySelector('#view');
   const go = async (v) => { w.location.hash = '#/' + v; await sleep(500); };
-  ok('menu lateral montado', w.document.querySelectorAll('#nav a').length === 12, w.document.querySelectorAll('#nav a').length);
+  ok('menu lateral montado', w.document.querySelectorAll('#nav a').length === 13, w.document.querySelectorAll('#nav a').length);
   ok('badge de pedidos novos', /1/.test(w.document.querySelector('#navbadge').textContent));
-  for (const v of ['dashboard', 'orders', 'products', 'categories', 'groups', 'combos', 'coupons', 'zones', 'stock', 'reports', 'users', 'settings']) {
+  for (const v of ['dashboard', 'orders', 'customers', 'products', 'categories', 'groups', 'combos', 'coupons', 'zones', 'stock', 'reports', 'users', 'settings']) {
     await go(v); ok('tela ' + v, V().textContent.trim().length > 20, V().innerHTML.slice(0, 120));
   }
   await go('orders');

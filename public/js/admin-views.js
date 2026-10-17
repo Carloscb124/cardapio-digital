@@ -33,7 +33,7 @@ VIEWS.dashboard = { label: 'Resumo', icon: 'bi-speedometer2', roles: STAFF, rend
 function orderDetail(o) {
   const wa = o.customer_phone.length <= 11 ? '55' + o.customer_phone : o.customer_phone;
   return `<div class="mb-2">${badge(o.status)} <span class="text-muted small">${dt(o.created_at)}</span></div>
-    <div><strong>${esc(o.customer_name)}</strong> · ${esc(o.customer_phone)} ${me.role !== 'cozinha' ? `<a class="btn btn-sm btn-outline-success ms-1" target="_blank" rel="noopener" href="https://wa.me/${esc(wa)}"><i class="bi bi-whatsapp"></i></a>` : ''}</div>
+    <div><strong>${esc(o.customer_name)}</strong> · ${esc(o.customer_phone)} ${me.role !== 'cozinha' ? `<a class="btn btn-sm btn-outline-success ms-1" target="_blank" rel="noopener" title="Chamar no WhatsApp com o link de acompanhamento" href="https://wa.me/${esc(wa)}?text=${encodeURIComponent(`Olá! Acompanhe seu pedido #${o.number}: ${location.origin}/pedido/${o.tracking_token}`)}"><i class="bi bi-whatsapp"></i></a>` : ''}</div>
     <div class="mb-2">${o.type === 'entrega' ? `<i class="bi bi-bicycle"></i> Entrega: ${esc(o.address)}${o.neighborhood ? ' — ' + esc(o.neighborhood) : ''}` : '<i class="bi bi-shop"></i> Retirada no local'}</div>
     <table class="table table-sm"><tbody>${o.items.map((i) => `<tr><td>${i.quantity}x ${esc(i.name)}${i.options.map((x) => `<div class="small text-muted">+ ${esc(x.name)}${x.price_delta ? ' (' + money(x.price_delta) + ')' : ''}</div>`).join('')}${i.notes ? `<div class="small text-muted">Obs: ${esc(i.notes)}</div>` : ''}</td><td class="text-end">${money(i.unit_price * i.quantity)}</td></tr>`).join('')}</tbody></table>
     <div class="d-flex justify-content-between"><span>Subtotal</span><span>${money(o.subtotal)}</span></div>
@@ -41,7 +41,8 @@ function orderDetail(o) {
     ${o.discount ? `<div class="d-flex justify-content-between text-success"><span>Desconto</span><span>− ${money(o.discount)}</span></div>` : ''}
     <div class="d-flex justify-content-between fw-bold fs-5"><span>Total</span><span>${money(o.total)}</span></div>
     <div class="mt-2">Pagamento: ${esc(PAY[o.payment_method])}${o.change_for ? ` · troco para ${money(o.change_for)}` : ''}</div>
-    ${o.notes ? `<div class="alert alert-light mt-2 mb-0">Obs: ${esc(o.notes)}</div>` : ''}`;
+    ${o.notes ? `<div class="alert alert-light mt-2 mb-0">Obs: ${esc(o.notes)}</div>` : ''}
+    ${me.role !== 'cozinha' && o.tracking_token ? `<div class="mt-3 small">Link de acompanhamento do cliente: <a href="/pedido/${esc(o.tracking_token)}" target="_blank" rel="noopener">abrir</a> <button class="btn btn-sm btn-outline-secondary ms-1" data-copy="${esc(location.origin)}/pedido/${esc(o.tracking_token)}">Copiar link</button></div>` : ''}`;
 }
 
 VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root) {
@@ -70,7 +71,7 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tab) { tab = b.dataset.tab; $$('[data-tab]').forEach((x) => x.classList.toggle('active', x === b)); $('#hist').classList.toggle('d-none', tab === 'open'); load(); }
     else if (b.id === 'hGo') load();
-    else if (b.dataset.det !== undefined) { try { const o = await api('/api/orders/' + rows[+b.dataset.det].id); infoModal(`Pedido #${o.number}`, orderDetail(o)); } catch (err) { fail(err); } }
+    else if (b.dataset.det !== undefined) { try { const o = await api('/api/orders/' + rows[+b.dataset.det].id); const m = infoModal(`Pedido #${o.number}`, orderDetail(o)); m.addEventListener('click', async (ev) => { const c = ev.target.closest('[data-copy]'); if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast('Link copiado.'); } catch { toast('Copie o link manualmente.', 'warning'); } } }); } catch (err) { fail(err); } }
     else if (b.dataset.st) {
       const [i, n] = b.dataset.st.split(':'), o = rows[+i];
       if (n === 'cancelado' && !confirm(`Cancelar o pedido #${o.number}? O estoque será devolvido.`)) return;
@@ -82,6 +83,22 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
   const onNew = () => document.body.contains(root) && load();
   window.addEventListener('orders-changed', onNew);
   load(); every(load, 15000);
+} };
+
+/* ---------- Clientes ---------- */
+VIEWS.customers = { label: 'Clientes', icon: 'bi-person-lines-fill', roles: STAFF, async render(root) {
+  root.innerHTML = '<h1 class="h4 mb-1"><i class="bi bi-person-lines-fill"></i> Clientes</h1><p class="text-muted">Quem já pediu na sua loja. "Conta" indica clientes que criaram login no cardápio.</p><div class="panel table-responsive" id="tbl">Carregando...</div>';
+  let rows; try { rows = await api('/api/customers'); } catch (e) { return fail(e); }
+  $('#tbl').innerHTML = rows.length ? `<table class="table align-middle mb-0"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Total gasto</th><th>Último pedido</th><th>Conta</th><th></th></tr></thead><tbody>${rows.map((c, i) => `<tr><td><strong>${esc(c.name)}</strong><div class="small text-muted">${esc(maskPhone(c.phone))}</div></td><td>${c.orders}</td><td>${money(c.spent)}</td><td>${c.last_order ? dt(c.last_order) : '—'}</td><td>${yesno(c.account_id)}</td><td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener" href="https://wa.me/${c.phone.length <= 11 ? '55' : ''}${esc(c.phone)}" title="Chamar no WhatsApp"><i class="bi bi-whatsapp"></i></a>${me.role === 'admin' && c.account_id ? ` <button class="btn btn-sm btn-outline-primary" data-reset="${i}" title="Gerar link de nova senha"><i class="bi bi-key"></i></button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="text-muted">Nenhum cliente ainda. Eles aparecem aqui depois do primeiro pedido.</div>';
+  root.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-reset]'); if (!b) return;
+    try {
+      const { path } = await api(`/api/customers/${rows[+b.dataset.reset].account_id}/reset-link`, { method: 'POST' });
+      const url = location.origin + path;
+      const m = infoModal('Link de nova senha do cliente', `<p>Envie este link ao cliente pelo WhatsApp. Vale por 1 hora e só pode ser usado uma vez.</p><input class="form-control" readonly id="lnk" value="${esc(url)}"><button class="btn btn-primary mt-2" id="cp">Copiar</button>`);
+      $('#cp', m).onclick = async () => { $('#lnk', m).select(); try { await navigator.clipboard.writeText(url); toast('Link copiado.'); } catch { toast('Selecione e copie manualmente.', 'warning'); } };
+    } catch (err) { fail(err); }
+  });
 } };
 
 /* ---------- Cardápio ---------- */

@@ -14,7 +14,7 @@ function open(jar) {
   const w = dom.window, ctx = dom.getInternalVMContext();
   w.fetch = async (u, o = {}) => { const r = await fetch(new URL(u, BASE), { ...o, headers: { ...(o.headers || {}), cookie: jar.c } }); const sc = r.headers.get('set-cookie'); if (sc) jar.c = sc.split(';')[0]; return r; };
   const run = (f) => new vm.Script(read(f), { filename: f }).runInContext(ctx);
-  run('public/js/api.js'); run('public/js/signup.js');
+  run('public/js/api.js'); run('public/js/br.js'); run('public/js/signup.js');
   return w;
 }
 const type = (w, id, v) => { const el = w.document.getElementById(id); el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); };
