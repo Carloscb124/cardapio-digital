@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Criar conta — Cardápio Digital</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23123D2B'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h8' stroke='%23E8B931' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/bricolage-grotesque@5/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/figtree@5/index.css">
+<link rel="stylesheet" href="/css/landing.css">
+</head><body>
+<div class="auth-grid">
+  <aside class="pitch">
+    <a class="brand" href="/">Cardápio Digital</a>
+    <h1>Crie sua conta e abra seu cardápio online</h1>
+    <p>Depois do cadastro você já entra no painel e pode cadastrar o primeiro produto.</p>
+    <ul class="checks"><li>Link próprio para divulgar o cardápio</li><li>Pedidos salvos no painel e enviados pelo WhatsApp</li><li>Perfis separados para atendimento e cozinha</li></ul>
+  </aside>
+  <main class="form-wrap">
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Seu estabelecimento</legend>
+        <div class="field"><label for="name">Nome do estabelecimento</label>
+          <input type="text" id="name" autocomplete="organization" maxlength="120" aria-describedby="err-name" required>
+          <p class="msg" id="err-name" role="alert"></p></div>
+        <div class="field"><label for="slug">Endereço do seu cardápio</label>
+          <div class="slug-input"><span class="prefix" id="prefix"></span><input type="text" id="slug" maxlength="40" autocapitalize="none" autocomplete="off" spellcheck="false" aria-describedby="hint-slug err-slug" required></div>
+          <p class="hint" id="hint-slug">Letras minúsculas, números e hífen. É o link que seus clientes vão abrir.</p>
+          <p class="msg" id="err-slug" role="alert"></p></div>
+        <div class="field"><label for="whatsapp">WhatsApp que receberá os pedidos</label>
+          <input type="tel" id="whatsapp" inputmode="numeric" autocomplete="tel-national" placeholder="(11) 99999-8888" maxlength="16" aria-describedby="err-whatsapp" required>
+          <p class="msg" id="err-whatsapp" role="alert"></p></div>
+      </fieldset>
+      <fieldset>
+        <legend>Seu acesso</legend>
+        <div class="field"><label for="owner">Seu nome</label>
+          <input type="text" id="owner" autocomplete="name" maxlength="100" aria-describedby="err-owner" required>
+          <p class="msg" id="err-owner" role="alert"></p></div>
+        <div class="field"><label for="email">E-mail</label>
+          <input type="email" id="email" autocomplete="email" maxlength="150" aria-describedby="err-email" required>
+          <p class="msg" id="err-email" role="alert"></p></div>
+        <div class="field"><label for="password">Senha</label>
+          <div class="pw"><input type="password" id="password" autocomplete="new-password" maxlength="100" aria-describedby="rules err-password" required><button type="button" id="toggle" aria-pressed="false">Mostrar</button></div>
+          <div class="meter" id="meter" data-level="0" aria-hidden="true"><i></i><i></i><i></i></div>
+          <ul class="rules" id="rules"><li data-rule="len">Pelo menos 8 caracteres</li><li data-rule="letter">Uma letra</li><li data-rule="digit">Um número</li></ul>
+          <p class="msg" id="err-password" role="alert"></p></div>
+        <div class="field"><label for="confirm">Repita a senha</label>
+          <input type="password" id="confirm" autocomplete="new-password" maxlength="100" aria-describedby="err-confirm" required>
+          <p class="msg" id="err-confirm" role="alert"></p></div>
+      </fieldset>
+      <div class="hp" aria-hidden="true"><label>Não preencha este campo <input type="text" id="website" tabindex="-1" autocomplete="off"></label></div>
+      <p class="form-error" id="formErr" role="alert"></p>
+      <button class="btn submit" id="submit" type="submit">Criar minha conta</button>
+      <p class="alt-link">Já tem conta? <a class="link" href="/login">Entrar</a></p>
+    </form>
+  </main>
+</div>
+<script src="/js/api.js"></script>
+<script src="/js/signup.js"></script>
+</body></html>
