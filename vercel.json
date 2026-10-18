@@ -1,0 +1,21 @@
+{
+  "rewrites": [
+    { "source": "/m/:slug", "destination": "/menu.html" },
+    { "source": "/pedido/:token", "destination": "/track.html" },
+    { "source": "/print/:id", "destination": "/print.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/cadastro", "destination": "/cadastro.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

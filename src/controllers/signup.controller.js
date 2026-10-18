@@ -1,9 +1,10 @@
 const service = require('../services/signup.service');
-const { wrap } = require('../utils/http');
+const { wrap, HttpError } = require('../utils/http');
 
 exports.slug = wrap(async (req, res) => res.json(await service.slugAvailable(String(req.params.slug || '').toLowerCase())));
 
 exports.create = wrap(async (req, res, next) => {
+  if (process.env.SIGNUP_ENABLED === 'false') throw new HttpError(403, 'O cadastro de novas contas está temporariamente fechado.');
   const u = await service.createAccount(req.body || {});
   // Já entra logado: renova a sessão (evita fixação de sessão) e grava o usuário.
   req.session.regenerate((err) => {

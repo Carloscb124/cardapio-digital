@@ -34,7 +34,7 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
 (async () => {
   /* ===== Cliente: cardápio público ===== */
   let jar = { c: '' };
-  let w = makeWindow('views/menu.html', BASE + '/m/demo', jar);
+  let w = makeWindow('public/menu.html', BASE + '/m/demo', jar);
   w.run('public/js/api.js'); w.run('public/js/br.js'); w.run('public/js/menu.js'); w.run('public/js/account.js'); await sleep(600);
   const $ = (s) => w.document.querySelector(s);
   ok('menu renderiza produtos', w.document.querySelectorAll('#list .prod').length >= 4, $('#list').textContent.slice(0, 100));
@@ -65,7 +65,7 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
 
   /* ===== Painel administrativo ===== */
   jar = { c: '' };
-  w = makeWindow('views/admin.html', BASE + '/admin', jar);
+  w = makeWindow('public/admin.html', BASE + '/admin', jar);
   w.run('public/js/api.js');
   await w.api('/api/auth/login', { method: 'POST', body: { email: 'admin@demo.local', password: process.env.ADMIN_PASS } });
   w.exec('csrfToken = null'); // a sessão foi renovada pelo login (no navegador a página recarrega)

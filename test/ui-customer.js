@@ -40,7 +40,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   await adm('POST', '/api/auth/login', { email: 'admin@demo.local', password: process.env.ADMIN_PASS });
 
   /* ===== Cliente: criar conta ===== */
-  const jar = { c: '' }; let w = open('views/menu.html', BASE + '/m/demo', MENU, jar); await sleep(600);
+  const jar = { c: '' }; let w = open('public/menu.html', BASE + '/m/demo', MENU, jar); await sleep(600);
   ok('botões de conta no topo do cardápio', !!w.document.getElementById('acctBtn') && /Entrar/.test(txt(w, '#acctLabel')));
   click(w, w.document.getElementById('acctBtn'));
   ok('janela de conta abre no login', !!w.document.getElementById('fLogin'));
@@ -80,7 +80,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   ok('"pedir de novo" recoloca o item no carrinho', w.document.getElementById('cartCount').textContent === '1' && /X-Frango/.test(txt(w, '#cartBody')), txt(w, '#cartCount'));
 
   /* ===== Acompanhamento ===== */
-  const tw = open('views/track.html', BASE + trackHref, ['public/js/api.js', 'public/js/track.js']); await sleep(700);
+  const tw = open('public/track.html', BASE + trackHref, ['public/js/api.js', 'public/js/track.js']); await sleep(700);
   ok('página de acompanhamento mostra o pedido e aguarda confirmação', /Pedido #1/.test(txt(tw, '#app')) && /Aguardando o estabelecimento confirmar/.test(txt(tw, '.status-box')), txt(tw, '#app').slice(0, 150));
   ok('mostra botão do WhatsApp enquanto não confirmado', !!tw.document.querySelector('a[href^="https://wa.me/"]') && /ainda não enviou/.test(txt(tw, '#app')));
   ok('linha do tempo com etapa atual', /Pedido registrado/.test(txt(tw, '.tl li.now')) && tw.document.querySelectorAll('.tl li').length === 6);
@@ -90,7 +90,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   for (const s of ['preparo', 'pronto', 'saiu_entrega', 'concluido']) await adm('POST', `/api/orders/${id}/status`, { status: s });
   await tw.load(); await sleep(300);
   ok('pedido concluído: todas as etapas marcadas e sem "atualiza sozinha"', tw.document.querySelectorAll('.tl li.done').length === 6 && /Bom apetite/.test(txt(tw, '.status-box')) && !/atualiza sozinha/.test(txt(tw, '#app')));
-  const bw = open('views/track.html', BASE + '/pedido/' + 'a'.repeat(32), ['public/js/api.js', 'public/js/track.js']); await sleep(600);
+  const bw = open('public/track.html', BASE + '/pedido/' + 'a'.repeat(32), ['public/js/api.js', 'public/js/track.js']); await sleep(600);
   ok('link inválido mostra mensagem amigável', /Pedido não encontrado/.test(txt(bw, '#app')));
 
   /* ===== Sair, entrar, recuperar senha ===== */
@@ -102,7 +102,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   const cust = (await adm('GET', '/api/customers')).data.find((c) => c.phone === '21977771234');
   ok('painel lista a cliente com conta', cust && cust.account_id && cust.orders === 1, cust);
   const tok = (await adm('POST', `/api/customers/${cust.account_id}/reset-link`)).data.path;
-  const rw = open('views/menu.html', BASE + tok, MENU); await sleep(900);
+  const rw = open('public/menu.html', BASE + tok, MENU); await sleep(900);
   ok('link de nova senha abre a tela de redefinição', !!rw.document.getElementById('fReset') && /Nova senha/.test(txt(rw, '#acctTitle')));
   type(rw, 'rsPass', '123'); type(rw, 'rsConfirm', '123'); submit(rw, 'fReset'); await sleep(500); ok('senha fraca recusada na redefinição', rw.document.getElementById('rsPass').classList.contains('is-invalid'), txt(rw, '#acctBody').slice(0, 120));
   type(rw, 'rsPass', 'novasenha9'); type(rw, 'rsConfirm', 'novasenha9'); submit(rw, 'fReset'); await sleep(700);
@@ -111,7 +111,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   ok('login com a nova senha', /Olá, Carla/.test(txt(rw, '#acctLabel')), txt(rw, '#acctLabel'));
 
   /* ===== Painel: Clientes ===== */
-  const aj = { c: '' }; const aw = open('views/admin.html', BASE + '/admin', ['public/js/api.js'], aj);
+  const aj = { c: '' }; const aw = open('public/admin.html', BASE + '/admin', ['public/js/api.js'], aj);
   await aw.api('/api/auth/login', { method: 'POST', body: { email: 'admin@demo.local', password: process.env.ADMIN_PASS } });
   aw.exec('csrfToken = null'); ['public/js/br.js', 'public/js/admin-core.js', 'public/js/admin-views.js'].forEach((f) => aw.exec(read(f))); await sleep(500);
   aw.location.hash = '#/customers'; await sleep(700);

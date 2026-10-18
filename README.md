@@ -61,7 +61,7 @@ Substitua os arquivos (mantenha `.env` e a pasta `uploads/`), rode `npm install`
 Um serviço local futuro (ex.: pequeno programa Node na máquina do caixa) pode consultar essa rota autenticada e enviar à impressora, sem extensão de navegador.
 
 ## Estrutura
-`src/routes` → `src/controllers` → `src/services` → `src/config/db.js` · `src/middleware/auth.js` (sessão, perfis, CSRF) · `database/schema.sql` · `views/` e `public/` (telas) · `uploads/` (imagens) · `test/`
+`src/routes` → `src/controllers` → `src/services` → `src/config/db.js` · `src/middleware/auth.js` (sessão, perfis, CSRF) · `database/schema.sql` · `public/` (telas e arquivos estáticos) · `vercel.json` · `test/`
 
 ## Segurança aplicada
 bcrypt; consultas parametrizadas; sessão HttpOnly + SameSite=Strict; CSRF em toda escrita; limite de tentativas (login, redefinição, pedidos públicos); Helmet/CSP; isolamento por `establishment_id` em toda consulta; upload só JPG/PNG/WebP com conferência dos primeiros bytes, nome aleatório e limite de 2 MB; credenciais em `.env`.
@@ -80,7 +80,6 @@ npm run test:ui-customer
 Os testes de cadastro e de cliente aceitam `BASE2` (servidor com `SIGNUP_RATE_LIMIT=3` e `CUSTOMER_RATE_LIMIT=3`) para validar o limite de tentativas. `test:signup` usa `BASE2` (opcional) para testar o limite de tentativas: suba um segundo servidor com `SIGNUP_RATE_LIMIT=3` e `PORT=3998`.
 (use um banco de teste: os testes criam pedidos, usuários e alteram configurações da loja demo.)
 
-## Antes de publicar na internet
-- Sessões ficam em memória (reiniciar o servidor desloga todos): trocar por store em MySQL.
-- Use HTTPS (`NODE_ENV=production` ativa cookie `secure` e HSTS) e um proxy reverso.
-- Faça backup do banco e da pasta `uploads/`.
+## Publicar na internet
+Veja **DEPLOY-VERCEL.md** (passo a passo para a Vercel com MySQL na nuvem). Sessões e imagens enviadas ficam no banco, então o sistema funciona em hospedagem sem disco persistente. Use HTTPS e faça backup do banco.
+Variáveis úteis: `DB_SSL`, `DB_SSL_CA`/`DB_SSL_CA_FILE`, `DB_POOL`, `SIGNUP_ENABLED=false` (fecha cadastros), `SESSION_STORE=memory` (só para desenvolvimento).

@@ -1,13 +1,11 @@
 const mysql = require('mysql2/promise');
 
 module.exports = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  ...require('./db-options')(),
   database: process.env.DB_NAME,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: Number(process.env.DB_POOL) || 10, // na Vercel use 3: cada instância tem o seu pool
+  enableKeepAlive: true,
   dateStrings: true,
   decimalNumbers: true,
 });

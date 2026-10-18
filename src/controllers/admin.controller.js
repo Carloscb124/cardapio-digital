@@ -1,4 +1,4 @@
-const fs = require('fs');
+const db = require('../config/db');
 const settings = require('../services/settings.service');
 const users = require('../services/users.service');
 const orders = require('../services/orders.service');
@@ -7,7 +7,7 @@ const reports = require('../services/reports.service');
 const ticket = require('../services/ticket.service');
 const schemas = require('../config/schemas');
 const toCsv = require('../utils/csv');
-const { hasValidMagic } = require('../config/upload');
+const { hasValidMagic, newName } = require('../config/upload');
 const { parse } = require('../utils/validate');
 const { wrap, HttpError } = require('../utils/http');
 
@@ -62,8 +62,10 @@ exports.reports = {
   }),
 };
 
-exports.upload = (req, res) => {
+exports.upload = wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Envie uma imagem JPG, PNG ou WebP.' });
-  if (!hasValidMagic(req.file)) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'Arquivo de imagem inválido.' }); }
-  res.status(201).json({ url: `/uploads/${req.file.filename}` });
-};
+  if (!hasValidMagic(req.file)) return res.status(400).json({ error: 'Arquivo de imagem inválido.' });
+  const name = newName(req.file.mimetype);
+  await db.query('INSERT INTO uploads (name,mime,data) VALUES (?,?,?)', [name, req.file.mimetype, req.file.buffer]);
+  res.status(201).json({ url: `/uploads/${name}` });
+});

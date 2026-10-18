@@ -6,10 +6,7 @@ const mysql = require('mysql2/promise');
 (async () => {
   const name = process.env.DB_NAME;
   if (!/^[A-Za-z0-9_]+$/.test(name || '')) throw new Error('DB_NAME inválido no .env');
-  const conn = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost', port: Number(process.env.DB_PORT) || 3306,
-    user: process.env.DB_USER, password: process.env.DB_PASSWORD, multipleStatements: true,
-  });
+  const conn = await mysql.createConnection({ ...require('../src/config/db-options')(), multipleStatements: true });
   await conn.query(`CREATE DATABASE IF NOT EXISTS \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await conn.query(`USE \`${name}\``);
   await conn.query(fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8'));
