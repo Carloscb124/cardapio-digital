@@ -8,9 +8,11 @@ const HEAD = {
 const PAY = { dinheiro: 'Dinheiro', pix: 'Pix', cartao_credito: 'Cartão de crédito', cartao_debito: 'Cartão de débito' };
 const hm = (s) => new Date(String(s).replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 const day = (s) => new Date(String(s).replace(' ', 'T')).toLocaleDateString('pt-BR');
-let timer = null;
+let timer = null, pixData = null, lastData = null;
 
 function render(d) {
+  lastData = d;
+  if (!d.pix) pixData = null;
   const path = PATH[d.type], idx = path.indexOf(d.status), cancelled = d.status === 'cancelado', final = cancelled || d.status === 'concluido';
   const when = (st) => { const h = d.history.find((x) => x.status === st); return h ? hm(h.created_at) : ''; };
   const head = typeof HEAD[d.status] === 'function' ? HEAD[d.status](d.type) : HEAD[d.status];
@@ -21,6 +23,7 @@ function render(d) {
     <h1 class="h4 mt-3 mb-1">Pedido #${d.number}</h1><div class="text-muted small mb-3">${day(d.created_at)} às ${hm(d.created_at)} · ${d.type === 'entrega' ? 'Entrega' : 'Retirada'}</div>
     <div class="status-box ${cancelled ? 'cancelled' : ''}" aria-live="polite"><div class="fs-5 fw-semibold">${esc(head)}</div>
       ${!final && d.type === 'entrega' && d.store.est_delivery_minutes ? `<div class="small mt-1">Tempo médio de entrega: cerca de ${d.store.est_delivery_minutes} min.</div>` : ''}</div>
+    ${d.pix && pixData ? pixHtml(pixData, d.total) : ''}
     ${d.whatsappUrl ? `<div class="alert alert-warning mt-3 mb-0">Se você ainda não enviou o pedido pelo WhatsApp, o estabelecimento não o recebeu. <a class="btn btn-success btn-sm d-block mt-2" href="${esc(d.whatsappUrl)}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Enviar pelo WhatsApp</a></div>` : ''}
     ${cancelled ? `<p class="mt-3 mb-0">Se tiver dúvidas, fale com o estabelecimento.</p>` : `<div class="panel mt-3"><ol class="tl mb-0">${path.map((st, i) => `<li class="${i < idx || (i === idx && final) ? 'done' : i === idx ? 'now' : ''}">${st === 'pronto' && d.type === 'retirada' ? 'Pronto para retirada' : LABEL[st]}${when(st) && i <= idx ? `<small>${when(st)}</small>` : ''}</li>`).join('')}</ol></div>`}
     <div class="panel mt-3"><h2 class="h6">Resumo</h2>
@@ -36,6 +39,12 @@ function render(d) {
     ${final ? '' : '<p class="small text-muted text-center mt-3 mb-0">Esta página atualiza sozinha.</p>'}`;
   clearTimeout(timer);
   if (!final) timer = setTimeout(load, 10000);
+  if (d.pix && !pixData) loadPix();
+}
+
+// O QR Code é buscado uma única vez e reaproveitado nas atualizações automáticas.
+async function loadPix() {
+  try { pixData = await api(`/api/public/track/${encodeURIComponent(token)}/pix`); if (lastData) render(lastData); } catch { /* sem Pix para este pedido */ }
 }
 
 async function load() {

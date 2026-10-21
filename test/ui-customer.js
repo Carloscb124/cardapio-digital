@@ -113,7 +113,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   /* ===== Painel: Clientes ===== */
   const aj = { c: '' }; const aw = open('public/admin.html', BASE + '/admin', ['public/js/api.js'], aj);
   await aw.api('/api/auth/login', { method: 'POST', body: { email: 'admin@demo.local', password: process.env.ADMIN_PASS } });
-  aw.exec('csrfToken = null'); ['public/js/br.js', 'public/js/admin-core.js', 'public/js/admin-views.js'].forEach((f) => aw.exec(read(f))); await sleep(500);
+  aw.exec('csrfToken = null'); ['public/js/br.js', 'public/js/pix.js', 'public/js/admin-neworder.js', 'public/js/admin-core.js', 'public/js/admin-views.js'].forEach((f) => aw.exec(read(f))); await sleep(500);
   aw.location.hash = '#/customers'; await sleep(700);
   ok('tela Clientes lista a cliente com total gasto', /Carla Dias/.test(txt(aw, '#view')) && /\(21\) 97777-1234/.test(txt(aw, '#view')));
   click(aw, aw.document.querySelector('[data-reset]')); await sleep(500);

@@ -69,12 +69,12 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
   w.run('public/js/api.js');
   await w.api('/api/auth/login', { method: 'POST', body: { email: 'admin@demo.local', password: process.env.ADMIN_PASS } });
   w.exec('csrfToken = null'); // a sessão foi renovada pelo login (no navegador a página recarrega)
-  w.run('public/js/br.js'); w.run('public/js/admin-core.js'); w.run('public/js/admin-views.js'); await sleep(500);
+  w.run('public/js/br.js'); w.run('public/js/pix.js'); w.run('public/js/admin-neworder.js'); w.run('public/js/admin-core.js'); w.run('public/js/admin-views.js'); await sleep(500);
   const V = () => w.document.querySelector('#view');
   const go = async (v) => { w.location.hash = '#/' + v; await sleep(500); };
-  ok('menu lateral montado', w.document.querySelectorAll('#nav a').length === 13, w.document.querySelectorAll('#nav a').length);
+  ok('menu lateral montado', w.document.querySelectorAll('#nav a').length === 14, w.document.querySelectorAll('#nav a').length);
   ok('badge de pedidos novos', /1/.test(w.document.querySelector('#navbadge').textContent));
-  for (const v of ['dashboard', 'orders', 'customers', 'products', 'categories', 'groups', 'combos', 'coupons', 'zones', 'stock', 'reports', 'users', 'settings']) {
+  for (const v of ['dashboard', 'orders', 'customers', 'products', 'categories', 'groups', 'combos', 'coupons', 'zones', 'stock', 'pix', 'reports', 'users', 'settings']) {
     await go(v); ok('tela ' + v, V().textContent.trim().length > 20, V().innerHTML.slice(0, 120));
   }
   await go('orders');

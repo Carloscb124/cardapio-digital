@@ -6,6 +6,7 @@ const { isOpenNow } = require('./settings.service');
 const { HttpError, parseJson } = require('../utils/http');
 const { round2 } = require('../utils/validate');
 const { brl, PAY } = require('./ticket.service');
+const pixSvc = require('./pix.service');
 
 const PAYMENTS = Object.keys(PAY);
 const add = (m, k, q) => m.set(k, (m.get(k) || 0) + q);
@@ -94,13 +95,16 @@ function waUrl(e, order) {
   return `https://wa.me/${num}?text=${encodeURIComponent(whatsappText(order))}`;
 }
 
-async function createOrder(slug, b, accountId = null) {
-  const name = String(b.customer_name || '').trim();
+// opts.staff: pedido lançado pela equipe no painel (ignora horário, pausa e pedido mínimo; telefone é opcional).
+async function createOrderTx(slug, b, accountId = null, opts = {}) {
+  const staff = !!opts.staff;
+  let name = String(b.customer_name || '').trim();
   const phone = String(b.customer_phone || '').replace(/\D/g, '');
+  if (staff && !name) name = 'Cliente balcão';
   const type = b.type, pay = b.payment_method;
   const notes = b.notes ? String(b.notes).trim() : null;
   if (name.length < 2 || name.length > 100) throw new HttpError(400, 'Informe seu nome.');
-  if (phone.length < 10 || phone.length > 13) throw new HttpError(400, 'Informe um telefone válido com DDD.');
+  if (!(staff && !phone) && (phone.length < 10 || phone.length > 13)) throw new HttpError(400, 'Informe um telefone válido com DDD.');
   if (!['entrega', 'retirada'].includes(type)) throw new HttpError(400, 'Escolha entrega ou retirada.');
   if (!PAYMENTS.includes(pay)) throw new HttpError(400, 'Escolha a forma de pagamento.');
   if (notes && notes.length > 500) throw new HttpError(400, 'Observações muito longas.');
@@ -113,8 +117,8 @@ async function createOrder(slug, b, accountId = null) {
     const [[e]] = await conn.query('SELECT * FROM establishments WHERE slug=? FOR UPDATE', [String(slug)]);
     if (!e) throw new HttpError(404, 'Estabelecimento não encontrado.');
     e.opening_hours = parseJson(e.opening_hours);
-    if (e.orders_paused) throw new HttpError(409, 'O estabelecimento pausou temporariamente os pedidos.');
-    if (!isOpenNow(e.opening_hours)) throw new HttpError(409, 'Estamos fechados no momento. Confira o horário de funcionamento.');
+    if (!staff && e.orders_paused) throw new HttpError(409, 'O estabelecimento pausou temporariamente os pedidos.');
+    if (!staff && !isOpenNow(e.opening_hours)) throw new HttpError(409, 'Estamos fechados no momento. Confira o horário de funcionamento.');
     if (type === 'entrega' && !e.delivery_enabled) throw new HttpError(400, 'Este estabelecimento não faz entregas.');
     if (type === 'retirada' && !e.pickup_enabled) throw new HttpError(400, 'Este estabelecimento não oferece retirada.');
 
@@ -160,7 +164,7 @@ async function createOrder(slug, b, accountId = null) {
       if (o.track_stock) { if (o.stock_qty < qty) throw new HttpError(409, `"${o.name}" não tem estoque suficiente.`); stock.push(['option', id, qty]); }
     }
 
-    if (subtotal < e.min_order) throw new HttpError(400, `O pedido mínimo é de ${brl(e.min_order)}.`);
+    if (!staff && subtotal < e.min_order) throw new HttpError(400, `O pedido mínimo é de ${brl(e.min_order)}.`);
 
     let fee = 0, hood = null;
     if (type === 'entrega') {
@@ -188,13 +192,22 @@ async function createOrder(slug, b, accountId = null) {
     }
 
     const token = crypto.randomBytes(16).toString('hex');
-    const [cr] = await conn.query('INSERT INTO customers (establishment_id,name,phone) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name), id=LAST_INSERT_ID(id)', [e.id, name, phone]);
+    let customerId = null;
+    if (phone) { // guarda também o último endereço de entrega, para agilizar os próximos pedidos
+      const [cr] = await conn.query('INSERT INTO customers (establishment_id,name,phone,address,neighborhood) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name), address=COALESCE(VALUES(address), address), neighborhood=COALESCE(VALUES(neighborhood), neighborhood), id=LAST_INSERT_ID(id)',
+        [e.id, name, phone, type === 'entrega' ? address : null, hood]);
+      customerId = cr.insertId;
+    }
     const [[{ n: number }]] = await conn.query('SELECT COALESCE(MAX(number),0)+1 AS n FROM orders WHERE establishment_id=?', [e.id]);
     const [or] = await conn.query(
-      `INSERT INTO orders (establishment_id,number,customer_id,customer_name,customer_phone,type,address,neighborhood,subtotal,delivery_fee,discount,total,coupon_id,payment_method,change_for,notes,tracking_token,customer_account_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [e.id, number, cr.insertId, name, phone, type, type === 'entrega' ? address : null, hood, subtotal, fee, discount, total, couponId, pay, change, notes, token, accountId]);
+      `INSERT INTO orders (establishment_id,number,customer_id,customer_name,customer_phone,type,address,neighborhood,subtotal,delivery_fee,discount,total,coupon_id,payment_method,change_for,notes,tracking_token,customer_account_id,source,created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [e.id, number, customerId, name, phone, type, type === 'entrega' ? address : null, hood, subtotal, fee, discount, total, couponId, pay, change, notes, token, accountId, staff ? 'painel' : 'online', staff ? opts.userId || null : null]);
     await conn.query('INSERT INTO order_status_history (order_id,status) VALUES (?,?)', [or.insertId, 'aguardando']);
+    if (staff && opts.status === 'confirmado') { // pedido já aceito pela equipe
+      await conn.query("UPDATE orders SET status='confirmado' WHERE id=?", [or.insertId]);
+      await conn.query('INSERT INTO order_status_history (order_id,status) VALUES (?,?)', [or.insertId, 'confirmado']);
+    }
     for (const l of lines) {
       const [ir] = await conn.query('INSERT INTO order_items (order_id,product_id,combo_id,name,unit_price,quantity,notes) VALUES (?,?,?,?,?,?,?)', [or.insertId, l.product_id, l.combo_id, l.name, l.unit_price, l.quantity, l.notes]);
       for (const o of l.options) await conn.query('INSERT INTO order_item_options (order_item_id,option_id,name,price_delta) VALUES (?,?,?,?)', [ir.insertId, o.id, o.name, o.price_delta]);
@@ -205,8 +218,16 @@ async function createOrder(slug, b, accountId = null) {
     }
 
     const order = { number, customer_name: name, customer_phone: phone, type, address, neighborhood: hood, subtotal, delivery_fee: fee, discount, total, payment_method: pay, change_for: change, notes, items: lines };
-    return { id: or.insertId, number, total, whatsappUrl: waUrl(e, order), token, trackUrl: `/pedido/${token}` };
+    return { id: or.insertId, number, total, whatsappUrl: waUrl(e, order), token, trackUrl: `/pedido/${token}`, pixPayload: pay === 'pix' ? pixSvc.payloadFor(e, number, total) : null, pixName: e.pix_name };
   });
+}
+
+// Pagamento por Pix: QR Code estático com o valor exato do pedido (sem confirmação automática de pagamento).
+async function createOrder(slug, b, accountId = null, opts = {}) {
+  const r = await createOrderTx(slug, b, accountId, opts);
+  const { pixPayload, pixName } = r; delete r.pixPayload; delete r.pixName;
+  r.pix = pixPayload ? { payload: pixPayload, qr: await pixSvc.qrDataUrl(pixPayload), name: pixName } : null;
+  return r;
 }
 
 module.exports = { getMenu, previewCoupon, createOrder, whatsappText, waUrl };

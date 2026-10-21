@@ -49,6 +49,7 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
   const kitchen = me.role === 'cozinha';
   let tab = 'open';
   root.innerHTML = `<div class="d-flex flex-wrap gap-2 align-items-center mb-3"><h1 class="h4 mb-0 me-auto"><i class="bi bi-receipt"></i> ${kitchen ? 'Cozinha' : 'Pedidos'}</h1>
+    ${kitchen ? '' : '<button class="btn btn-primary" id="newOrder"><i class="bi bi-plus-lg"></i> Novo pedido</button>'}
     ${kitchen ? '' : '<div class="btn-group"><button class="btn btn-outline-success active" data-tab="open">Em andamento</button><button class="btn btn-outline-success" data-tab="hist">Histórico</button></div>'}</div>
     <div id="hist" class="panel mb-3 d-none"><div class="row g-2"><div class="col-6 col-md-3"><input class="form-control" type="date" id="hFrom"></div><div class="col-6 col-md-3"><input class="form-control" type="date" id="hTo"></div><div class="col-8 col-md-4"><input class="form-control" id="hQ" placeholder="Nº do pedido ou cliente"></div><div class="col-4 col-md-2"><button class="btn btn-primary w-100" id="hGo">Filtrar</button></div></div></div>
     <div id="list" class="row g-3"></div>`;
@@ -59,7 +60,7 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
     try { rows = await api('/api/orders?' + qs); } catch (e) { return fail(e); }
     if (!document.body.contains(root)) return;
     $('#list').innerHTML = rows.length ? rows.map((o, i) => `<div class="col-md-6 col-xl-4"><div class="panel h-100 d-flex flex-column">
-      <div class="d-flex justify-content-between"><strong>#${o.number}</strong>${badge(o.status)}</div>
+      <div class="d-flex justify-content-between"><strong>#${o.number} ${o.source === 'painel' ? '<span class="badge bg-light text-dark border fw-normal">Painel</span>' : ''}</strong>${badge(o.status)}</div>
       <div class="small text-muted">${dt(o.created_at)} · ${o.type === 'entrega' ? 'Entrega' : 'Retirada'}${o.neighborhood ? ' · ' + esc(o.neighborhood) : ''}</div>
       <div class="mt-1">${esc(o.customer_name)} <span class="text-muted small">· ${o.items_count} item(ns)</span></div>
       <div class="price fs-5">${money(o.total)}</div>
@@ -69,6 +70,7 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
   };
   root.addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'newOrder') return openNewOrder();
     if (b.dataset.tab) { tab = b.dataset.tab; $$('[data-tab]').forEach((x) => x.classList.toggle('active', x === b)); $('#hist').classList.toggle('d-none', tab === 'open'); load(); }
     else if (b.id === 'hGo') load();
     else if (b.dataset.det !== undefined) { try { const o = await api('/api/orders/' + rows[+b.dataset.det].id); const m = infoModal(`Pedido #${o.number}`, orderDetail(o)); m.addEventListener('click', async (ev) => { const c = ev.target.closest('[data-copy]'); if (c) { try { await navigator.clipboard.writeText(c.dataset.copy); toast('Link copiado.'); } catch { toast('Copie o link manualmente.', 'warning'); } } }); } catch (err) { fail(err); } }
@@ -87,18 +89,39 @@ VIEWS.orders = { label: 'Pedidos', icon: 'bi-receipt', roles: EVERY, render(root
 
 /* ---------- Clientes ---------- */
 VIEWS.customers = { label: 'Clientes', icon: 'bi-person-lines-fill', roles: STAFF, async render(root) {
-  root.innerHTML = '<h1 class="h4 mb-1"><i class="bi bi-person-lines-fill"></i> Clientes</h1><p class="text-muted">Quem já pediu na sua loja. "Conta" indica clientes que criaram login no cardápio.</p><div class="panel table-responsive" id="tbl">Carregando...</div>';
-  let rows; try { rows = await api('/api/customers'); } catch (e) { return fail(e); }
-  $('#tbl').innerHTML = rows.length ? `<table class="table align-middle mb-0"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Total gasto</th><th>Último pedido</th><th>Conta</th><th></th></tr></thead><tbody>${rows.map((c, i) => `<tr><td><strong>${esc(c.name)}</strong><div class="small text-muted">${esc(maskPhone(c.phone))}</div></td><td>${c.orders}</td><td>${money(c.spent)}</td><td>${c.last_order ? dt(c.last_order) : '—'}</td><td>${yesno(c.account_id)}</td><td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener" href="https://wa.me/${c.phone.length <= 11 ? '55' : ''}${esc(c.phone)}" title="Chamar no WhatsApp"><i class="bi bi-whatsapp"></i></a>${me.role === 'admin' && c.account_id ? ` <button class="btn btn-sm btn-outline-primary" data-reset="${i}" title="Gerar link de nova senha"><i class="bi bi-key"></i></button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="text-muted">Nenhum cliente ainda. Eles aparecem aqui depois do primeiro pedido.</div>';
+  root.innerHTML = `<div class="d-flex flex-wrap gap-2 align-items-center mb-3"><h1 class="h4 mb-0 me-auto"><i class="bi bi-person-lines-fill"></i> Clientes</h1><input class="form-control" style="max-width:260px" id="cq" placeholder="Buscar nome ou telefone" aria-label="Buscar cliente"><button class="btn btn-primary" id="newCust"><i class="bi bi-plus-lg"></i> Novo cliente</button></div>
+    <p class="text-muted">Clientes cadastrados por você ou que já pediram. "Conta" indica quem criou login no cardápio online.</p><div class="panel table-responsive" id="tbl">Carregando...</div>`;
+  let rows = [], q = '', timer;
+  const draw = async () => {
+    try { rows = await api('/api/customers' + (q ? '?q=' + encodeURIComponent(q) : '')); } catch (e) { return fail(e); }
+    $('#tbl').innerHTML = rows.length ? `<table class="table align-middle mb-0"><thead><tr><th>Cliente</th><th>Pedidos</th><th>Total gasto</th><th>Último pedido</th><th>Conta</th><th></th></tr></thead><tbody>${rows.map((c, i) => `<tr><td><strong>${esc(c.name)}</strong><div class="small text-muted">${esc(maskPhone(c.phone))}${c.address ? ' · ' + esc(c.address) + (c.neighborhood ? ' — ' + esc(c.neighborhood) : '') : ''}</div>${c.notes ? `<div class="small text-muted">Obs: ${esc(c.notes)}</div>` : ''}</td><td>${c.orders}</td><td>${money(c.spent)}</td><td>${c.last_order ? dt(c.last_order) : '—'}</td><td>${yesno(c.account_id)}</td><td class="text-end text-nowrap"><button class="btn btn-sm btn-primary" data-order="${i}" title="Fazer pedido para este cliente"><i class="bi bi-bag-plus"></i></button> <button class="btn btn-sm btn-outline-secondary" data-edit="${i}" title="Editar"><i class="bi bi-pencil"></i></button> <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener" href="https://wa.me/${c.phone.length <= 11 ? '55' : ''}${esc(c.phone)}" title="Chamar no WhatsApp"><i class="bi bi-whatsapp"></i></a>${me.role === 'admin' && c.account_id ? ` <button class="btn btn-sm btn-outline-primary" data-reset="${i}" title="Gerar link de nova senha"><i class="bi bi-key"></i></button>` : ''}${me.role === 'admin' ? ` <button class="btn btn-sm btn-outline-danger" data-del="${i}" title="Excluir"><i class="bi bi-trash"></i></button>` : ''}</td></tr>`).join('')}</tbody></table>` : `<div class="text-muted">${q ? 'Nenhum cliente encontrado.' : 'Nenhum cliente ainda. Cadastre em "Novo cliente" ou eles aparecem aqui depois do primeiro pedido.'}</div>`;
+  };
+  const form = (row) => {
+    const el = formModal({ title: row ? 'Editar cliente' : 'Novo cliente', values: row ? { ...row, phone: maskPhone(row.phone) } : {},
+      fields: [{ name: 'name', label: 'Nome', req: true, maxlength: 100 }, { name: 'phone', label: 'WhatsApp (com DDD)', type: 'tel', req: true, maxlength: 16 }, { name: 'address', label: 'Endereço de entrega', maxlength: 255 }, { name: 'neighborhood', label: 'Bairro', maxlength: 100 }, { name: 'notes', label: 'Observações (ex.: alergias, preferências)', type: 'textarea' }],
+      save: async (d) => { await api(row ? `/api/customers/${row.id}` : '/api/customers', { method: row ? 'PUT' : 'POST', body: d }); toast('Cliente salvo.'); draw(); } });
+    el.addEventListener('input', (ev) => { if (ev.target.id === 'f_phone') ev.target.value = maskPhone(ev.target.value); });
+  };
+  $('#cq').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { q = $('#cq').value.trim(); draw(); }, 300); });
   root.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-reset]'); if (!b) return;
-    try {
-      const { path } = await api(`/api/customers/${rows[+b.dataset.reset].account_id}/reset-link`, { method: 'POST' });
-      const url = location.origin + path;
-      const m = infoModal('Link de nova senha do cliente', `<p>Envie este link ao cliente pelo WhatsApp. Vale por 1 hora e só pode ser usado uma vez.</p><input class="form-control" readonly id="lnk" value="${esc(url)}"><button class="btn btn-primary mt-2" id="cp">Copiar</button>`);
-      $('#cp', m).onclick = async () => { $('#lnk', m).select(); try { await navigator.clipboard.writeText(url); toast('Link copiado.'); } catch { toast('Selecione e copie manualmente.', 'warning'); } };
-    } catch (err) { fail(err); }
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'newCust') form(null);
+    else if (b.dataset.edit !== undefined) form(rows[+b.dataset.edit]);
+    else if (b.dataset.order !== undefined) openNewOrder(rows[+b.dataset.order]);
+    else if (b.dataset.del !== undefined) {
+      const c = rows[+b.dataset.del];
+      if (!confirm(`Excluir o cliente ${c.name}? Os pedidos dele continuam no histórico.`)) return;
+      try { await api('/api/customers/' + c.id, { method: 'DELETE' }); toast('Cliente excluído.'); draw(); } catch (err) { fail(err); }
+    } else if (b.dataset.reset !== undefined) {
+      try {
+        const { path } = await api(`/api/customers/${rows[+b.dataset.reset].account_id}/reset-link`, { method: 'POST' });
+        const url = location.origin + path;
+        const m = infoModal('Link de nova senha do cliente', `<p>Envie este link ao cliente pelo WhatsApp. Vale por 1 hora e só pode ser usado uma vez.</p><input class="form-control" readonly id="lnk" value="${esc(url)}"><button class="btn btn-primary mt-2" id="cp">Copiar</button>`);
+        $('#cp', m).onclick = async () => { $('#lnk', m).select(); try { await navigator.clipboard.writeText(url); toast('Link copiado.'); } catch { toast('Selecione e copie manualmente.', 'warning'); } };
+      } catch (err) { fail(err); }
+    }
   });
+  draw();
 } };
 
 /* ---------- Cardápio ---------- */
@@ -255,6 +278,31 @@ VIEWS.users = { label: 'Usuários', icon: 'bi-people', roles: ALL, render: crudV
     } catch (e) { fail(e); }
   },
 }) };
+
+/* ---------- Pix ---------- */
+VIEWS.pix = { label: 'Pix', icon: 'bi-qr-code', roles: ALL, async render(root) {
+  let cfg; try { cfg = await api('/api/pix'); } catch (e) { return fail(e); }
+  const HINT = { cpf: 'Somente os 11 números (pontos e traço são aceitos).', cnpj: 'Somente os 14 números (pontos, barra e traço são aceitos).', telefone: 'DDD + número, ex.: (11) 99999-8888.', email: 'O e-mail cadastrado como chave Pix.', aleatoria: 'Código no formato 123e4567-e89b-12d3-a456-426614174000.' };
+  const fields = [
+    { name: 'pix_key_type', label: 'Tipo da chave', type: 'select', options: [{ value: '', label: 'Escolha...' }, { value: 'cpf', label: 'CPF' }, { value: 'cnpj', label: 'CNPJ' }, { value: 'telefone', label: 'Telefone' }, { value: 'email', label: 'E-mail' }, { value: 'aleatoria', label: 'Chave aleatória' }] },
+    { name: 'pix_key', label: 'Chave Pix', maxlength: 77, help: HINT[cfg.pix_key_type] || 'Escolha o tipo e digite a chave.' },
+    { name: 'pix_name', label: 'Nome do recebedor (até 25 caracteres)', maxlength: 25, help: 'Como aparece na conta que recebe o Pix. Sem acentos: o sistema ajusta.' },
+    { name: 'pix_city', label: 'Cidade do recebedor (até 15 caracteres)', maxlength: 15 },
+  ];
+  root.innerHTML = `<h1 class="h4 mb-1"><i class="bi bi-qr-code"></i> Pix ${cfg.configured ? '<span class="badge bg-success fs-6 align-middle">Ativo</span>' : '<span class="badge bg-secondary fs-6 align-middle">Desativado</span>'}</h1>
+    <p class="text-muted">Cadastre a chave Pix que vai receber os pagamentos. Quem escolher Pix verá um QR Code com o valor exato do pedido e o botão para copiar o código. O sistema <strong>não confirma</strong> o pagamento sozinho: confira o recebimento no app do seu banco.</p>
+    <div class="row g-3"><div class="col-lg-6"><form class="panel" id="pForm" novalidate>${fields.map((f) => fieldHtml(f, cfg[f.name])).join('')}
+      <div class="text-danger small mb-2" id="pErr" role="alert"></div><button class="btn btn-primary">Salvar chave Pix</button>${cfg.configured ? ' <button type="button" class="btn btn-outline-danger" id="pOff">Desativar Pix</button>' : ''}</form></div>
+    <div class="col-lg-6">${cfg.preview ? pixHtml(cfg.preview, 1, { title: 'QR Code de teste (R$ 1,00)', note: 'Leia com o app do seu banco para conferir o nome do recebedor antes de pagar. Não precisa pagar: é só um teste.' }) : '<div class="panel text-muted">Depois de salvar, aparece aqui um QR Code de teste para você conferir no app do seu banco.</div>'}</div></div>`;
+  $('#f_pix_key_type', root).addEventListener('change', (e) => { $('#f_pix_key', root).parentElement.querySelector('.form-text').textContent = HINT[e.target.value] || 'Escolha o tipo e digite a chave.'; });
+  const save = async (body, okMsg) => {
+    $('#pErr', root).textContent = ''; $$('.is-invalid', root).forEach((x) => x.classList.remove('is-invalid'));
+    try { await api('/api/pix', { method: 'PUT', body }); toast(okMsg); VIEWS.pix.render(root); }
+    catch (err) { $('#pErr', root).textContent = err.message; const f = err.field && $('#f_' + err.field, root); if (f) { f.classList.add('is-invalid'); f.focus(); } else fail(err); }
+  };
+  $('#pForm', root).addEventListener('submit', (e) => { e.preventDefault(); save(collect(fields, root), 'Chave Pix salva.'); });
+  if (cfg.configured) $('#pOff', root).addEventListener('click', () => { if (confirm('Desativar o Pix? Os clientes deixam de ver o QR Code.')) save({ pix_key: '' }, 'Pix desativado.'); });
+} };
 
 /* ---------- Configurações ---------- */
 VIEWS.settings = { label: 'Configurações', icon: 'bi-gear', roles: ALL, async render(root) {

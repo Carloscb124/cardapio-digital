@@ -108,10 +108,41 @@ async function reorder(est, accountId, orderId) {
 }
 
 /* ----- Uso do painel (equipe) ----- */
-const adminList = async (est) => (await db.query(
-  `SELECT c.id, c.name, c.phone, COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN o.status<>'cancelado' THEN o.total END),0) AS spent, MAX(o.created_at) AS last_order,
-          (SELECT a.id FROM customer_accounts a WHERE a.establishment_id=c.establishment_id AND a.phone=c.phone) AS account_id
-     FROM customers c LEFT JOIN orders o ON o.customer_id=c.id WHERE c.establishment_id=? GROUP BY c.id ORDER BY last_order DESC, c.id DESC LIMIT 500`, [est]))[0];
+const trimOrNull = (v, max, field, label) => { const t = typeof v === 'string' ? v.trim() : ''; if (t.length > max) bad(field, `${label} muito longo (máx. ${max} caracteres).`); return t || null; };
+
+function cleanCustomer(b) {
+  const name = typeof b.name === 'string' ? b.name.trim() : '';
+  if (name.length < 2 || name.length > 100) bad('name', 'Informe o nome do cliente (2 a 100 caracteres).');
+  const phone = nationalPhone(b.phone);
+  if (!phone) bad('phone', 'WhatsApp inválido. Use DDD e número, ex.: (11) 99999-8888.');
+  return { name, phone, address: trimOrNull(b.address, 255, 'address', 'Endereço'), neighborhood: trimOrNull(b.neighborhood, 100, 'neighborhood', 'Bairro'), notes: trimOrNull(b.notes, 255, 'notes', 'Observações') };
+}
+const dup = (e) => { if (e.code === 'ER_DUP_ENTRY') bad('phone', 'Já existe um cliente com este WhatsApp.', 409); throw e; };
+
+async function adminCreate(est, b) {
+  const d = cleanCustomer(b);
+  try { return (await db.query('INSERT INTO customers (establishment_id,name,phone,address,neighborhood,notes) VALUES (?,?,?,?,?,?)', [est, d.name, d.phone, d.address, d.neighborhood, d.notes]))[0].insertId; } catch (e) { return dup(e); }
+}
+async function adminUpdate(est, id, b) {
+  const d = cleanCustomer(b);
+  const [[c]] = await db.query('SELECT id FROM customers WHERE establishment_id=? AND id=?', [est, id]);
+  if (!c) throw new HttpError(404, 'Cliente não encontrado.');
+  try { await db.query('UPDATE customers SET name=?, phone=?, address=?, neighborhood=?, notes=? WHERE id=?', [d.name, d.phone, d.address, d.neighborhood, d.notes, id]); } catch (e) { dup(e); }
+}
+async function adminRemove(est, id) {
+  const [r] = await db.query('DELETE FROM customers WHERE establishment_id=? AND id=?', [est, id]);
+  if (!r.affectedRows) throw new HttpError(404, 'Cliente não encontrado.');
+}
+
+async function adminList(est, q) {
+  const where = ['c.establishment_id=?'], p = [est];
+  const text = String(q || '').trim().slice(0, 50), digits = text.replace(/\D/g, '');
+  if (text) { where.push(digits ? '(c.name LIKE ? OR c.phone LIKE ?)' : 'c.name LIKE ?'); p.push(`%${text}%`); if (digits) p.push(`%${digits}%`); }
+  return (await db.query(
+    `SELECT c.id, c.name, c.phone, c.address, c.neighborhood, c.notes, COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN o.status<>'cancelado' THEN o.total END),0) AS spent, MAX(o.created_at) AS last_order,
+            (SELECT a.id FROM customer_accounts a WHERE a.establishment_id=c.establishment_id AND a.phone=c.phone) AS account_id
+       FROM customers c LEFT JOIN orders o ON o.customer_id=c.id WHERE ${where.join(' AND ')} GROUP BY c.id ORDER BY last_order DESC, c.id DESC LIMIT 500`, p))[0];
+}
 
 async function createResetToken(est, accountId) {
   const [[a]] = await db.query('SELECT id FROM customer_accounts WHERE establishment_id=? AND id=?', [est, accountId]);
@@ -129,4 +160,4 @@ async function resetPassword(est, token, password) {
   await db.query('UPDATE customer_accounts SET password_hash=?, reset_hash=NULL, reset_expires=NULL WHERE id=?', [await bcrypt.hash(password, 12), a.id]);
 }
 
-module.exports = { estBySlug, register, login, me, addAddress, removeAddress, changePassword, history, reorder, adminList, createResetToken, resetPassword };
+module.exports = { estBySlug, register, login, me, addAddress, removeAddress, changePassword, history, reorder, adminList, adminCreate, adminUpdate, adminRemove, createResetToken, resetPassword };

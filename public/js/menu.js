@@ -216,6 +216,7 @@ async function submit(btn) {
 function renderDone() {
   $('#cartBody').innerHTML = `<div class="text-center py-4"><i class="bi bi-check-circle text-success" style="font-size:3rem"></i>
     <h2 class="h5 mt-2">Pedido #${done.number} registrado</h2><p class="mb-1">Total: <strong>${money(done.total)}</strong></p>
+    ${done.pix ? pixHtml(done.pix, done.total) : ''}
     ${done.whatsappUrl ? `<div class="alert alert-warning text-start mt-3">Falta um passo: o estabelecimento só recebe seu pedido quando você <strong>enviar a mensagem pelo WhatsApp</strong>.</div>
       <a class="btn btn-success btn-lg w-100" href="${esc(done.whatsappUrl)}" target="_blank" rel="noopener"><i class="bi bi-whatsapp"></i> Abrir WhatsApp e enviar</a>`
     : `<div class="alert alert-warning text-start mt-3">Este estabelecimento ainda não configurou o WhatsApp. Entre em contato informando o número do pedido (#${done.number}).</div>`}

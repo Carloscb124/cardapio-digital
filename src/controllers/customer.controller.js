@@ -29,7 +29,10 @@ exports.reorder = wrap(async (req, res) => res.json(await svc.reorder(req.sessio
 exports.addAddress = wrap(async (req, res) => res.status(201).json({ id: await svc.addAddress(req.session.customer.id, req.body || {}) }));
 exports.removeAddress = wrap(async (req, res) => { await svc.removeAddress(req.session.customer.id, Number(req.params.addrId)); res.json({ ok: true }); });
 exports.password = wrap(async (req, res) => { await svc.changePassword(req.session.customer.id, req.body.current, req.body.password, req.body.confirm); res.json({ ok: true }); });
-exports.adminList = wrap(async (req, res) => res.json(await svc.adminList(req.session.user.establishmentId)));
+exports.adminList = wrap(async (req, res) => res.json(await svc.adminList(req.session.user.establishmentId, req.query.q)));
+exports.adminCreate = wrap(async (req, res) => res.status(201).json({ id: await svc.adminCreate(req.session.user.establishmentId, req.body || {}) }));
+exports.adminUpdate = wrap(async (req, res) => { await svc.adminUpdate(req.session.user.establishmentId, Number(req.params.id), req.body || {}); res.json({ ok: true }); });
+exports.adminRemove = wrap(async (req, res) => { await svc.adminRemove(req.session.user.establishmentId, Number(req.params.id)); res.json({ ok: true }); });
 exports.adminReset = wrap(async (req, res) => {
   const estId = req.session.user.establishmentId;
   const token = await svc.createResetToken(estId, Number(req.params.id));

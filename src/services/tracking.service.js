@@ -1,11 +1,15 @@
 const db = require('../config/db');
 const { HttpError } = require('../utils/http');
 const { waUrl } = require('./public.service');
+const pixSvc = require('./pix.service');
+
+const FINAL = ['concluido', 'cancelado'];
+const pixApplies = (o) => o.payment_method === 'pix' && pixSvc.configured(o) && !FINAL.includes(o.status) && o.total > 0;
 
 // Dados do acompanhamento: quem tem o link (token secreto de 128 bits) vê o próprio pedido.
 async function getByToken(token) {
   const [[o]] = await db.query(
-    `SELECT o.*, e.name AS store_name, e.slug AS store_slug, e.whatsapp AS store_whatsapp, e.est_delivery_minutes
+    `SELECT o.*, e.name AS store_name, e.slug AS store_slug, e.whatsapp AS store_whatsapp, e.est_delivery_minutes, e.pix_key, e.pix_name, e.pix_city
        FROM orders o JOIN establishments e ON e.id=o.establishment_id WHERE o.tracking_token=?`, [token]);
   if (!o) throw new HttpError(404, 'Pedido não encontrado. Confira o link.');
   const [items] = await db.query('SELECT id,name,unit_price,quantity,notes FROM order_items WHERE order_id=? ORDER BY id', [o.id]);
@@ -19,7 +23,14 @@ async function getByToken(token) {
     address: o.address, neighborhood: o.neighborhood, payment_method: o.payment_method, change_for: o.change_for, notes: o.notes,
     history, store: { name: o.store_name, slug: o.store_slug, whatsapp: o.store_whatsapp, est_delivery_minutes: o.est_delivery_minutes },
     // Enquanto a loja não confirmou, o cliente pode reenviar a mensagem pelo WhatsApp.
+    pix: pixApplies(o),
     whatsappUrl: o.status === 'aguardando' ? waUrl({ whatsapp: o.store_whatsapp }, full) : null,
   };
 }
-module.exports = { getByToken };
+async function getPix(token) {
+  const [[o]] = await db.query('SELECT o.number, o.total, o.status, o.payment_method, e.pix_key, e.pix_name, e.pix_city FROM orders o JOIN establishments e ON e.id=o.establishment_id WHERE o.tracking_token=?', [token]);
+  if (!o || !pixApplies(o)) throw new HttpError(404, 'Pagamento por Pix indisponível para este pedido.');
+  const payload = pixSvc.payloadFor(o, o.number, o.total);
+  return { payload, qr: await pixSvc.qrDataUrl(payload), name: o.pix_name, total: o.total };
+}
+module.exports = { getByToken, getPix };

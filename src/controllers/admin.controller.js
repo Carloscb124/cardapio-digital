@@ -5,6 +5,8 @@ const orders = require('../services/orders.service');
 const stock = require('../services/stock.service');
 const reports = require('../services/reports.service');
 const ticket = require('../services/ticket.service');
+const publicSvc = require('../services/public.service');
+const pixSvc = require('../services/pix.service');
 const schemas = require('../config/schemas');
 const toCsv = require('../utils/csv');
 const { hasValidMagic, newName } = require('../config/upload');
@@ -12,6 +14,7 @@ const { parse } = require('../utils/validate');
 const { wrap, HttpError } = require('../utils/http');
 
 const U = (req) => req.session.user;
+const slugOf = async (req) => (await db.query('SELECT slug FROM establishments WHERE id=?', [U(req).establishmentId]))[0][0].slug;
 const est = (req) => U(req).establishmentId;
 const id = (req) => Number(req.params.id);
 
@@ -22,6 +25,11 @@ exports.settings = {
     req.session.user.establishmentName = req.body.name;
     res.json({ ok: true });
   }),
+};
+
+exports.pix = {
+  get: wrap(async (req, res) => res.json({ ...(await pixSvc.get(est(req))), preview: await pixSvc.preview(est(req)) })),
+  save: wrap(async (req, res) => { const c = await pixSvc.save(est(req), req.body); res.json({ ...c, preview: await pixSvc.preview(est(req)) }); }),
 };
 
 exports.users = {
@@ -44,6 +52,10 @@ exports.orders = {
   }),
   counts: wrap(async (req, res) => res.json(await orders.counts(est(req)))),
   status: wrap(async (req, res) => { await orders.setStatus(est(req), id(req), req.body.status, U(req).role); res.json({ ok: true }); }),
+  menu: wrap(async (req, res) => res.json(await publicSvc.getMenu(await slugOf(req)))),
+  couponPreview: wrap(async (req, res) => res.json(await publicSvc.previewCoupon(await slugOf(req), req.body.code, req.body.subtotal))),
+  // Pedido lançado pela equipe (balcão, telefone, WhatsApp): mesmas validações de preço, opções e estoque do cardápio público.
+  create: wrap(async (req, res) => res.status(201).json(await publicSvc.createOrder(await slugOf(req), req.body || {}, null, { staff: true, userId: U(req).id, status: req.body && req.body.status }))),
   ticket: wrap(async (req, res) => res.json(ticket.build(await orders.get(est(req), id(req)), U(req).establishmentName))),
 };
 

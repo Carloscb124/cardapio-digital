@@ -7,4 +7,5 @@ exports.order = wrap(async (req, res) => {
   const c = req.session.customer; // pedido feito logado fica vinculado à conta do cliente
   res.status(201).json(await s.createOrder(req.params.slug, req.body, c && c.slug === req.params.slug ? c.id : null));
 });
+exports.trackPix = wrap(async (req, res) => res.json(await require('../services/tracking.service').getPix(req.params.token)));
 exports.track = wrap(async (req, res) => res.json(await require('../services/tracking.service').getByToken(req.params.token)));

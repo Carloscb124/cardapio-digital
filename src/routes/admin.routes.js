@@ -39,6 +39,9 @@ router.post('/combos', adminOnly, catalog.combos.save(true));
 router.put('/combos/:id', adminOnly, catalog.combos.save(false));
 router.delete('/combos/:id', adminOnly, del('combos'));
 
+router.get('/pix', adminOnly, admin.pix.get);
+router.put('/pix', adminOnly, admin.pix.save);
+
 router.get('/settings', adminOnly, admin.settings.get);
 router.put('/settings', adminOnly, admin.settings.update);
 router.post('/uploads', adminOnly, upload.single('image'), admin.upload);
@@ -50,11 +53,17 @@ router.post('/users/:id/reset-link', adminOnly, admin.users.resetLink);
 
 router.get('/orders', admin.orders.list);
 router.get('/orders/counts', admin.orders.counts);
+router.get('/orders/menu', staff, admin.orders.menu);
+router.post('/orders/coupon-preview', staff, admin.orders.couponPreview);
+router.post('/orders', staff, admin.orders.create);
 router.get('/orders/:id', admin.orders.get);
 router.get('/orders/:id/ticket', staff, admin.orders.ticket);
 router.post('/orders/:id/status', admin.orders.status);
 
 router.get('/customers', staff, customers.adminList);
+router.post('/customers', staff, customers.adminCreate);
+router.put('/customers/:id', staff, customers.adminUpdate);
+router.delete('/customers/:id', adminOnly, customers.adminRemove);
 router.post('/customers/:id/reset-link', adminOnly, customers.adminReset);
 
 router.get('/stock', adminOnly, admin.stock.list);
