@@ -1,7 +1,6 @@
 node_modules
 .env
 .env.production
-ca.pem
 .vercel
 uploads/*
 !uploads/.gitkeep
