@@ -2,9 +2,9 @@ const db = require('../config/db');
 const { HttpError } = require('../utils/http');
 
 async function list(est) {
-  const [p] = await db.query("SELECT id, name, stock_qty AS qty, stock_min AS min FROM products WHERE establishment_id=? AND track_stock=1 ORDER BY name", [est]);
+  const [p] = await db.query("SELECT p.id, p.name, COALESCE(c.name,'Sem categoria') AS category, p.stock_qty AS qty, p.stock_min AS min FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.establishment_id=? AND p.track_stock=1 ORDER BY category, p.name", [est]);
   const [o] = await db.query(
-    `SELECT o.id, CONCAT(o.name,' (',g.name,')') AS name, o.stock_qty AS qty, 0 AS min FROM options o
+    `SELECT o.id, CONCAT(o.name,' (',g.name,')') AS name, CONCAT('Adicional: ',g.name) AS category, o.stock_qty AS qty, 0 AS min FROM options o
        JOIN option_groups g ON g.id=o.group_id WHERE g.establishment_id=? AND o.track_stock=1 ORDER BY g.name, o.name`, [est]);
   const mark = (type) => (r) => ({ ...r, type, low: r.qty <= r.min });
   return [...p.map(mark('product')), ...o.map(mark('option'))];

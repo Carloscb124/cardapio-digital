@@ -13,7 +13,7 @@ router.param('addrId', (req, res, next, v) => (/^\d+$/.test(v) ? next() : res.st
 
 router.post('/:slug/register', regLimiter, c.register);
 router.post('/:slug/login', authLimiter, c.login);
-router.post('/:slug/reset', authLimiter, c.reset);
+router.post('/:slug/recover', authLimiter, c.recover);
 router.post('/:slug/logout', c.logout);
 router.get('/:slug/me', c.requireCustomer, c.me);
 router.get('/:slug/orders', c.requireCustomer, c.orders);
@@ -21,4 +21,5 @@ router.post('/:slug/orders/:orderId/reorder', c.requireCustomer, c.reorder);
 router.post('/:slug/addresses', c.requireCustomer, c.addAddress);
 router.delete('/:slug/addresses/:addrId', c.requireCustomer, c.removeAddress);
 router.post('/:slug/password', authLimiter, c.requireCustomer, c.password);
+router.post('/:slug/recovery-code', authLimiter, c.requireCustomer, c.newRecoveryCode);
 module.exports = router;

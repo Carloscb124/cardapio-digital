@@ -14,7 +14,12 @@
     "test:signup": "node test/signup.js",
     "test:ui-signup": "node test/ui-signup.js",
     "test:customer": "node test/customer.js",
-    "test:ui-customer": "node test/ui-customer.js"
+    "test:ui-customer": "node test/ui-customer.js",
+    "test:staff": "node test/staff.js",
+    "test:ui-staff": "node test/ui-staff.js",
+    "test:pix": "node test/pix.js",
+    "test:ui-pix": "node test/ui-pix.js",
+    "test:ui-products": "node test/ui-products.js"
   },
   "engines": {
     "node": ">=18"

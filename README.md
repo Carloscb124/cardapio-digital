@@ -30,19 +30,36 @@ Pedidos são **gravados no banco antes** de abrir o WhatsApp.
 
 ## Área do cliente
 - **Acompanhar pedido:** ao registrar o pedido, o cliente recebe um link secreto (`/pedido/<código>`) com a linha do tempo (registrado, confirmado, em preparação, pronto, saiu para entrega, concluído), horários de cada etapa e o resumo. A página atualiza sozinha a cada 10 s. Enquanto a loja não confirma, ela oferece reenviar o pedido pelo WhatsApp. A equipe copia o link no detalhe do pedido.
-- **Conta do cliente (por loja):** login com WhatsApp + senha (mín. 6). Dá histórico de pedidos, até 5 endereços salvos, checkout preenchido e "pedir de novo" (usa preços e disponibilidade atuais; itens indisponíveis são avisados). Só pedidos feitos com o cliente logado entram no histórico: ninguém vê pedidos de outro cliente só por saber o telefone.
-- **Esqueci a senha:** não há SMS/e-mail. No painel, em **Clientes**, o administrador gera um link de nova senha (1 hora, uso único) e envia pelo WhatsApp.
+- **Conta do cliente universal:** um único cadastro (WhatsApp + senha, mín. 6) vale em **todas as lojas** do sistema. Dá histórico de pedidos (de todas as lojas, com o nome de cada uma), até 5 endereços salvos, checkout preenchido e "pedir de novo" (na loja do pedido, com preços e disponibilidade atuais; itens indisponíveis são avisados). Cada loja só enxerga os pedidos feitos nela. Só pedidos feitos com o cliente logado entram no histórico: ninguém vê pedidos de outro cliente só por saber o telefone.
+- **Esqueci a senha:** ao criar a conta o cliente recebe, uma única vez, um **código de recuperação** (ex.: `ABCD-EFGH-JKLM`, guardado só como hash). Com WhatsApp + código ele cria uma nova senha e recebe um código novo. Contas antigas geram o primeiro código em "Minha conta › Segurança". **A loja não gera mais link de senha do cliente**: como a conta é compartilhada entre lojas, isso permitiria a um lojista tomar a conta de um cliente em todas as outras. Quem perder a senha e o código precisa de um novo cadastro com outro número (recuperação por SMS/e-mail exigiria um serviço pago).
 - **Painel › Clientes:** quem já pediu, total gasto, último pedido e se tem conta.
 - Os links usam o endereço do site. Em `localhost` só funcionam no seu computador; para testar no celular, use o IP do PC na mesma rede Wi-Fi (ex.: `http://192.168.0.10:3000`) ou publique o sistema.
 
 ## Atualizando um banco já existente
 Substitua os arquivos (mantenha `.env` e a pasta `uploads/`), rode `npm install` e `npm start`. As migrações (`src/migrations`) rodam sozinhas no início e são seguras para repetir; os pedidos antigos ganham link de acompanhamento.
 
+## Pedidos e clientes lançados pela equipe
+- **Novo pedido (painel › Pedidos):** administrador e atendente lançam pedidos de balcão, telefone ou WhatsApp. Busca de produto, adicionais e combos, escolha de cliente cadastrado (ou cliente avulso), entrega ou retirada, bairro e taxa, pagamento e troco, cupom e situação inicial (já confirmado ou aguardando). Ao criar, o painel oferece a comanda, o link de acompanhamento e o envio dele pelo WhatsApp ao cliente.
+- Mesmas validações do cardápio online (preço recalculado no servidor, opções, estoque, cupom). Diferenças: a equipe **não é barrada** por horário, pausa de pedidos nem pedido mínimo, e o telefone é opcional. Esses pedidos recebem o selo "Painel" e guardam quem os criou.
+- **Clientes (painel › Clientes):** cadastrar, editar, buscar por nome/telefone e "fazer pedido" já com os dados do cliente. A cozinha não acessa clientes. Só o administrador exclui (os pedidos permanecem no histórico). O endereço do último pedido de entrega online fica salvo no cadastro.
+
+## Pix (QR Code e copia e cola)
+- **Painel › Pix (administrador):** cadastre a chave (CPF, CNPJ, telefone, e-mail ou chave aleatória), o nome e a cidade do recebedor. O sistema valida CPF/CNPJ (dígitos verificadores), telefone, e-mail e formato da chave aleatória. Depois de salvar aparece um **QR Code de teste de R$ 1,00**: leia com o app do seu banco para conferir o nome do recebedor antes de pagar (não precisa pagar). Chave vazia desativa o Pix.
+- **Cliente:** ao escolher Pix, a tela do pedido mostra o QR Code com o **valor exato** (itens, entrega e cupom) e o botão **Copiar código Pix**. O mesmo bloco aparece na página de acompanhamento enquanto o pedido não for concluído ou cancelado.
+- **Equipe:** no **Novo pedido** com Pix, o QR Code aparece para mostrar ao cliente no balcão.
+- É um **Pix estático** (padrão BR Code do Banco Central, validado com o exemplo oficial e com leitura do QR gerado). **O sistema não confirma o pagamento sozinho**: o dinheiro cai direto na sua conta e você confere no app do banco. Confirmação automática exigiria uma integração com um PSP/banco (Pix dinâmico + webhook), que pode ser a próxima etapa.
+
+## Produtos por categoria (painel › Produtos)
+Os produtos aparecem **agrupados por categoria**, com contagem, filtro por categoria (chips), busca por nome/descrição, "só indisponíveis", botão **Adicionar aqui** (já com a categoria escolhida) e um interruptor para ligar/desligar a disponibilidade direto na lista. O seletor de produtos dos combos e a tela de Estoque também mostram a categoria.
+
+## Visual
+Painel, cardápio, acompanhamento e login usam o mesmo sistema visual da landing (Bricolage Grotesque + Figtree, verde-folha e mostarda como único acento). Menu do painel em grupos (Operação, Cardápio, Loja); cartões de pedido com borda colorida pela situação; no cardápio, categorias fixas no topo com destaque da categoria visível.
+
 ## Perfis
 | Perfil | Acesso |
 |---|---|
 | Administrador | Tudo do estabelecimento |
-| Atendente | Resumo, pedidos, impressão de comandas |
+| Atendente | Resumo, pedidos (inclui criar pedidos), clientes, impressão de comandas |
 | Cozinha | Apenas pedidos confirmados/em preparo (iniciar preparo → pronto) |
 
 **Recuperar acesso:** Usuários → ícone de chave gera um link de uso único (1 hora) que o administrador entrega ao usuário. Não depende de e-mail/SMTP.
@@ -76,6 +93,11 @@ npm run test:signup
 npm run test:ui-signup
 npm run test:customer
 npm run test:ui-customer
+npm run test:staff
+npm run test:ui-staff
+npm run test:pix
+npm run test:ui-pix
+npm run test:ui-products
 ```
 Os testes de cadastro e de cliente aceitam `BASE2` (servidor com `SIGNUP_RATE_LIMIT=3` e `CUSTOMER_RATE_LIMIT=3`) para validar o limite de tentativas. `test:signup` usa `BASE2` (opcional) para testar o limite de tentativas: suba um segundo servidor com `SIGNUP_RATE_LIMIT=3` e `PORT=3998`.
 (use um banco de teste: os testes criam pedidos, usuários e alteram configurações da loja demo.)

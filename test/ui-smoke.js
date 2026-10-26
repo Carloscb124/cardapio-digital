@@ -90,7 +90,7 @@ const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true
   form.dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); await sleep(500);
   ok('cria categoria pela interface', /Sobremesas/.test(V().textContent));
 
-  await go('products'); click(w, V().querySelector('#new')); await sleep(500);
+  await go('products'); click(w, V().querySelector('#newProd')); await sleep(500);
   form = w.document.querySelector('.modal form');
   form.querySelector('#f_name').value = 'Pudim'; form.querySelector('#f_price').value = '8.5';
   form.querySelector('#f_category_id').value = [...form.querySelector('#f_category_id').options].find((o) => o.textContent === 'Sobremesas').value;

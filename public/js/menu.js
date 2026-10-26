@@ -33,7 +33,7 @@ function prodCard(p) {
   const price = p.promo_price != null ? `<span class="old">${money(p.price)}</span>${money(p.promo_price)}` : money(p.price);
   return `<div class="prod ${p.soldOut ? 'off' : ''}" data-p="${p.id}">
     <div class="flex-grow-1"><div class="name">${esc(p.name)}</div><div class="desc">${esc(p.description)}</div>
-    <div class="price mt-1">${price} ${p.soldOut ? '<span class="badge bg-secondary">Esgotado</span>' : ''}</div></div>
+    <div class="foot"><span class="price">${price} ${p.soldOut ? '<span class="badge bg-secondary">Esgotado</span>' : ''}</span>${p.soldOut ? '' : '<span class="add" aria-hidden="true"><i class="bi bi-plus-lg"></i></span>'}</div></div>
     ${p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy">` : ''}</div>`;
 }
 
@@ -55,7 +55,21 @@ function renderList() {
     html += `<div class="sec-title" id="sec-${c.id}">${esc(c.name)}</div>` + ps.map(prodCard).join('');
   }
   $('#chips').innerHTML = chips;
+  watchSections();
   $('#list').innerHTML = html || '<div class="text-center text-muted py-5">Nenhum item encontrado.</div>';
+}
+
+// A categoria visível no momento fica destacada na barra fixa do topo.
+let sectionObserver = null;
+function watchSections() {
+  if (!('IntersectionObserver' in window)) return;
+  if (sectionObserver) sectionObserver.disconnect();
+  sectionObserver = new IntersectionObserver((entries) => {
+    const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (!top) return;
+    $$('.chip').forEach((c) => { const on = c.getAttribute('href') === '#' + top.target.id; c.classList.toggle('active', on); if (on && c.scrollIntoView) c.scrollIntoView({ inline: 'center', block: 'nearest' }); });
+  }, { rootMargin: '-70px 0px -70% 0px' });
+  $$('.sec-title').forEach((s) => sectionObserver.observe(s));
 }
 
 function renderBar() {

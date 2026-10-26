@@ -21,35 +21,42 @@ function checkPassword(pw, field = 'password') {
   if (COMMON.has(pw.toLowerCase()) || /^(.)\1+$/.test(pw)) bad(field, 'Esta senha é fácil de adivinhar. Escolha outra.');
 }
 
-async function register(est, b) {
+/* Código de recuperação: 12 caracteres (60 bits) sem letras parecidas (0/O, 1/I). Só o hash é guardado. */
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => [...crypto.randomBytes(12)].map((b) => ALPHABET[b % 32]).join('').match(/.{4}/g).join('-');
+const codeHash = (c) => sha(String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''));
+const sameHash = (a, b) => { const x = Buffer.from(a || ''), y = Buffer.from(b || ''); return x.length === y.length && x.length > 0 && crypto.timingSafeEqual(x, y); };
+
+async function register(b) {
   const name = typeof b.name === 'string' ? b.name.trim() : '';
   const phone = nationalPhone(b.phone);
   if (name.length < 2 || name.length > 100) bad('name', 'Informe seu nome (2 a 100 caracteres).');
   if (!phone) bad('phone', 'WhatsApp inválido. Use DDD e número, ex.: (11) 99999-8888.');
   checkPassword(b.password);
   if (b.confirm !== b.password) bad('confirm', 'As senhas não conferem.');
+  const code = newCode();
   try {
-    const [r] = await db.query('INSERT INTO customer_accounts (establishment_id,name,phone,password_hash) VALUES (?,?,?,?)', [est, name, phone, await bcrypt.hash(b.password, 12)]);
-    return { id: r.insertId, name, phone };
+    const [r] = await db.query('INSERT INTO customer_accounts (name,phone,password_hash,recovery_hash) VALUES (?,?,?,?)', [name, phone, await bcrypt.hash(b.password, 12), codeHash(code)]);
+    return { id: r.insertId, name, phone, recoveryCode: code };
   } catch (e) {
-    if (e.code === 'ER_DUP_ENTRY') bad('phone', 'Já existe uma conta com este WhatsApp. Entre na sua conta.', 409);
+    if (e.code === 'ER_DUP_ENTRY') bad('phone', 'Já existe uma conta com este WhatsApp. Entre na sua conta ou recupere a senha.', 409);
     throw e;
   }
 }
 
-async function login(est, rawPhone, password) {
+async function login(rawPhone, password) {
   const phone = nationalPhone(rawPhone);
-  const [[a]] = phone ? await db.query('SELECT * FROM customer_accounts WHERE establishment_id=? AND phone=?', [est, phone]) : [[]];
+  const [[a]] = phone ? await db.query('SELECT * FROM customer_accounts WHERE phone=?', [phone]) : [[]];
   const ok = await bcrypt.compare(String(password || ''), a ? a.password_hash : DUMMY);
   if (!a || !ok) throw new HttpError(401, 'WhatsApp ou senha incorretos.');
   return { id: a.id, name: a.name, phone: a.phone };
 }
 
-async function me(est, id) {
-  const [[a]] = await db.query('SELECT id,name,phone FROM customer_accounts WHERE establishment_id=? AND id=?', [est, id]);
+async function me(id) {
+  const [[a]] = await db.query('SELECT id,name,phone,(recovery_hash IS NOT NULL) AS has_recovery FROM customer_accounts WHERE id=?', [id]);
   if (!a) throw new HttpError(401, 'Sessão expirada.');
   const [addresses] = await db.query('SELECT id,label,address,neighborhood FROM customer_addresses WHERE account_id=? ORDER BY id', [id]);
-  return { ...a, addresses };
+  return { id: a.id, name: a.name, phone: a.phone, hasRecovery: !!a.has_recovery, addresses };
 }
 
 async function addAddress(id, b) {
@@ -59,8 +66,7 @@ async function addAddress(id, b) {
   if (hood && hood.length > 100) bad('neighborhood', 'Bairro muito longo.');
   const [[c]] = await db.query('SELECT COUNT(*) n FROM customer_addresses WHERE account_id=?', [id]);
   if (c.n >= 5) bad('address', 'Você pode salvar até 5 endereços. Remova um para adicionar outro.');
-  const [r] = await db.query('INSERT INTO customer_addresses (account_id,label,address,neighborhood) VALUES (?,?,?,?)', [id, label, address, hood]);
-  return r.insertId;
+  return (await db.query('INSERT INTO customer_addresses (account_id,label,address,neighborhood) VALUES (?,?,?,?)', [id, label, address, hood]))[0].insertId;
 }
 
 async function removeAddress(id, addrId) {
@@ -73,16 +79,40 @@ async function changePassword(id, current, next, confirm) {
   if (!(await bcrypt.compare(String(current || ''), a.password_hash))) bad('current', 'A senha atual está incorreta.');
   checkPassword(next, 'password');
   if (confirm !== next) bad('confirm', 'As senhas não conferem.');
-  await db.query('UPDATE customer_accounts SET password_hash=?, reset_hash=NULL, reset_expires=NULL WHERE id=?', [await bcrypt.hash(next, 12), id]);
+  await db.query('UPDATE customer_accounts SET password_hash=? WHERE id=?', [await bcrypt.hash(next, 12), id]);
 }
 
-const history = async (est, id) => (await db.query(
-  'SELECT id,number,status,type,total,created_at,tracking_token FROM orders WHERE establishment_id=? AND customer_account_id=? ORDER BY id DESC LIMIT 30', [est, id]))[0];
+// Esqueci a senha: telefone + código de recuperação. Gera um código novo (o antigo deixa de valer).
+async function recover(rawPhone, code, password, confirm) {
+  const phone = nationalPhone(rawPhone);
+  const invalid = () => { throw new HttpError(400, 'WhatsApp ou código de recuperação inválidos.', 'code'); };
+  const [[a]] = phone ? await db.query('SELECT id, recovery_hash FROM customer_accounts WHERE phone=?', [phone]) : [[]];
+  if (!a || !sameHash(a.recovery_hash, codeHash(code))) invalid();
+  checkPassword(password);
+  if (confirm !== password) bad('confirm', 'As senhas não conferem.');
+  const next = newCode();
+  await db.query('UPDATE customer_accounts SET password_hash=?, recovery_hash=? WHERE id=?', [await bcrypt.hash(password, 12), codeHash(next), a.id]);
+  return next;
+}
 
-// "Pedir de novo": remonta o carrinho com preços e disponibilidade ATUAIS; o servidor valida tudo de novo no pedido.
+async function rotateRecovery(id, currentPassword) {
+  const [[a]] = await db.query('SELECT password_hash FROM customer_accounts WHERE id=?', [id]);
+  if (!(await bcrypt.compare(String(currentPassword || ''), a.password_hash))) bad('current', 'A senha atual está incorreta.');
+  const next = newCode();
+  await db.query('UPDATE customer_accounts SET recovery_hash=? WHERE id=?', [codeHash(next), id]);
+  return next;
+}
+
+// A cliente vê os próprios pedidos de todas as lojas; cada loja só enxerga os pedidos feitos nela.
+const history = async (id) => (await db.query(
+  `SELECT o.id,o.number,o.status,o.type,o.total,o.created_at,o.tracking_token,e.name AS store_name,e.slug AS store_slug
+     FROM orders o JOIN establishments e ON e.id=o.establishment_id WHERE o.customer_account_id=? ORDER BY o.id DESC LIMIT 30`, [id]))[0];
+
+// "Pedir de novo": remonta o carrinho com preços e disponibilidade ATUAIS da loja; o servidor valida tudo de novo no pedido.
 async function reorder(est, accountId, orderId) {
-  const [[o]] = await db.query('SELECT id FROM orders WHERE id=? AND establishment_id=? AND customer_account_id=?', [orderId, est, accountId]);
+  const [[o]] = await db.query('SELECT id, establishment_id FROM orders WHERE id=? AND customer_account_id=?', [orderId, accountId]);
   if (!o) throw new HttpError(404, 'Pedido não encontrado.');
+  if (o.establishment_id !== est) throw new HttpError(400, 'Este pedido é de outra loja. Abra o cardápio dela para pedir de novo.');
   const [items] = await db.query('SELECT * FROM order_items WHERE order_id=? ORDER BY id', [orderId]);
   const lines = []; let skipped = 0;
   for (const it of items) {
@@ -101,13 +131,13 @@ async function reorder(est, accountId, orderId) {
         `SELECT op.id, op.name, op.price_delta FROM options op JOIN product_option_groups l ON l.group_id=op.group_id
           WHERE l.product_id=? AND op.available=1 AND (op.track_stock=0 OR op.stock_qty>=?) AND op.id IN (?)`, [p.id, it.quantity, ids]);
     }
-    if (opts.length !== saved.length) { skipped++; continue; } // alguma opção mudou ou acabou
+    if (opts.length !== saved.length) { skipped++; continue; }
     lines.push({ kind: 'product', id: p.id, name: p.name, unit: p.promo_price != null && p.promo_price < p.price ? p.promo_price : p.price, qty: it.quantity, options: opts, notes: it.notes || '' });
   }
   return { lines, skipped };
 }
 
-/* ----- Uso do painel (equipe) ----- */
+/* ----- Uso do painel (equipe): cadastro de clientes da loja ----- */
 const trimOrNull = (v, max, field, label) => { const t = typeof v === 'string' ? v.trim() : ''; if (t.length > max) bad(field, `${label} muito longo (máx. ${max} caracteres).`); return t || null; };
 
 function cleanCustomer(b) {
@@ -140,24 +170,8 @@ async function adminList(est, q) {
   if (text) { where.push(digits ? '(c.name LIKE ? OR c.phone LIKE ?)' : 'c.name LIKE ?'); p.push(`%${text}%`); if (digits) p.push(`%${digits}%`); }
   return (await db.query(
     `SELECT c.id, c.name, c.phone, c.address, c.neighborhood, c.notes, COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN o.status<>'cancelado' THEN o.total END),0) AS spent, MAX(o.created_at) AS last_order,
-            (SELECT a.id FROM customer_accounts a WHERE a.establishment_id=c.establishment_id AND a.phone=c.phone) AS account_id
+            (SELECT a.id FROM customer_accounts a WHERE a.phone=c.phone) AS account_id
        FROM customers c LEFT JOIN orders o ON o.customer_id=c.id WHERE ${where.join(' AND ')} GROUP BY c.id ORDER BY last_order DESC, c.id DESC LIMIT 500`, p))[0];
 }
 
-async function createResetToken(est, accountId) {
-  const [[a]] = await db.query('SELECT id FROM customer_accounts WHERE establishment_id=? AND id=?', [est, accountId]);
-  if (!a) throw new HttpError(404, 'Conta de cliente não encontrada.');
-  const token = crypto.randomBytes(32).toString('hex');
-  await db.query('UPDATE customer_accounts SET reset_hash=?, reset_expires=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=?', [sha(token), accountId]);
-  return token;
-}
-
-async function resetPassword(est, token, password) {
-  checkPassword(password);
-  if (typeof token !== 'string' || token.length !== 64) throw new HttpError(400, 'Link inválido ou expirado. Peça um novo ao estabelecimento.');
-  const [[a]] = await db.query('SELECT id FROM customer_accounts WHERE establishment_id=? AND reset_hash=? AND reset_expires>NOW()', [est, sha(token)]);
-  if (!a) throw new HttpError(400, 'Link inválido ou expirado. Peça um novo ao estabelecimento.');
-  await db.query('UPDATE customer_accounts SET password_hash=?, reset_hash=NULL, reset_expires=NULL WHERE id=?', [await bcrypt.hash(password, 12), a.id]);
-}
-
-module.exports = { estBySlug, register, login, me, addAddress, removeAddress, changePassword, history, reorder, adminList, adminCreate, adminUpdate, adminRemove, createResetToken, resetPassword };
+module.exports = { estBySlug, register, login, me, addAddress, removeAddress, changePassword, recover, rotateRecovery, history, reorder, adminList, adminCreate, adminUpdate, adminRemove };

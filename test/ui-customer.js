@@ -1,4 +1,4 @@
-// Teste de interface da área do cliente (jsdom): conta, endereços, pedido logado, histórico, pedir de novo, reset e acompanhamento.
+// Teste de interface da área do cliente (jsdom): conta, endereços, pedido logado, histórico, pedir de novo, recuperação por código e acompanhamento.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const BASE = process.env.BASE || 'http://localhost:3000';
@@ -21,7 +21,7 @@ function open(html, url, scripts, jar = { c: '' }) {
   scripts.forEach((f) => new vm.Script(read(f), { filename: f }).runInContext(ctx));
   return w;
 }
-const MENU = ['public/js/api.js', 'public/js/br.js', 'public/js/menu.js', 'public/js/account.js'];
+const MENU = ['public/js/api.js', 'public/js/pix.js', 'public/js/br.js', 'public/js/menu.js', 'public/js/account.js'];
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
 const change = (w, el) => el.dispatchEvent(new w.Event('change', { bubbles: true }));
 const type = (w, id, v) => { const el = w.document.getElementById(id); el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); };
@@ -50,7 +50,13 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   type(w, 'rgPass', '123'); type(w, 'rgConfirm', '123'); submit(w, 'fRegister'); ok('senha curta recusada', w.document.getElementById('rgPass').classList.contains('is-invalid'));
   type(w, 'rgPass', 'carla2026'); type(w, 'rgConfirm', 'outra'); submit(w, 'fRegister'); ok('confirmação diferente recusada', w.document.getElementById('rgConfirm').classList.contains('is-invalid'));
   type(w, 'rgConfirm', 'carla2026'); submit(w, 'fRegister'); await sleep(900);
-  ok('conta criada: topo mostra o nome e já entra logada', /Olá, Carla/.test(txt(w, '#acctLabel')) && /Carla Dias/.test(txt(w, '#acctBody')), txt(w, '#acctBody').slice(0, 150));
+  const code = txt(w, '#rcode');
+  ok('depois do cadastro mostra o código de recuperação, uma única vez', /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(code) && /Guarde seu código/.test(txt(w, '#acctBody')), txt(w, '#acctBody').slice(0, 120));
+  click(w, w.document.querySelector('[data-copy-text]')); await sleep(80);
+  ok('botão copiar do código funciona', /Código copiado/.test(txt(w, '[data-copy-text]')));
+  ok('já entra logada: topo mostra o nome', /Olá, Carla/.test(txt(w, '#acctLabel')));
+  click(w, w.document.getElementById('ackCode')); await sleep(300);
+  ok('depois de guardar o código, abre a conta', /Carla Dias/.test(txt(w, '#acctBody')) && !w.document.getElementById('rcode'), txt(w, '#acctBody').slice(0, 150));
   ok('histórico vazio com mensagem', /ainda não tem pedidos/.test(txt(w, '#histBox')));
 
   /* endereço salvo */
@@ -101,14 +107,18 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   ok('senha errada mostra mensagem', /incorretos/.test(txt(w, '#acctErr')) && !w.document.getElementById('acctErr').classList.contains('d-none'), txt(w, '#acctErr'));
   const cust = (await adm('GET', '/api/customers')).data.find((c) => c.phone === '21977771234');
   ok('painel lista a cliente com conta', cust && cust.account_id && cust.orders === 1, cust);
-  const tok = (await adm('POST', `/api/customers/${cust.account_id}/reset-link`)).data.path;
-  const rw = open('public/menu.html', BASE + tok, MENU); await sleep(900);
-  ok('link de nova senha abre a tela de redefinição', !!rw.document.getElementById('fReset') && /Nova senha/.test(txt(rw, '#acctTitle')));
-  type(rw, 'rsPass', '123'); type(rw, 'rsConfirm', '123'); submit(rw, 'fReset'); await sleep(500); ok('senha fraca recusada na redefinição', rw.document.getElementById('rsPass').classList.contains('is-invalid'), txt(rw, '#acctBody').slice(0, 120));
-  type(rw, 'rsPass', 'novasenha9'); type(rw, 'rsConfirm', 'novasenha9'); submit(rw, 'fReset'); await sleep(700);
-  ok('senha redefinida e volta ao login', /Senha definida/.test(txt(rw, '#acctBody')) && !!rw.document.getElementById('fLogin'), txt(rw, '#acctBody').slice(0, 150));
-  type(rw, 'lgPhone', '21977771234'); type(rw, 'lgPass', 'novasenha9'); submit(rw, 'fLogin'); await sleep(900);
-  ok('login com a nova senha', /Olá, Carla/.test(txt(rw, '#acctLabel')), txt(rw, '#acctLabel'));
+  click(w, w.document.querySelector('[data-acct="recover"]')); await sleep(200);
+  ok('"esqueci minha senha" abre o formulário de recuperação', !!w.document.getElementById('fRecover') && /Esqueci minha senha/.test(txt(w, '#acctTitle')));
+  type(w, 'rcPhone', '21977771234'); type(w, 'rcCode', 'AAAA-BBBB-CCCC'); type(w, 'rcPass', 'novasenha9'); type(w, 'rcConfirm', 'novasenha9'); submit(w, 'fRecover'); await sleep(700);
+  ok('código errado mostra erro no campo do código', w.document.getElementById('rcCode').classList.contains('is-invalid') && /inválidos/.test(txt(w, '#acctBody')), txt(w, '#acctBody').slice(0, 200));
+  type(w, 'rcCode', code.toLowerCase()); type(w, 'rcPass', '123'); type(w, 'rcConfirm', '123'); submit(w, 'fRecover'); await sleep(300);
+  ok('senha fraca é recusada antes de gastar o código', w.document.getElementById('rcPass').classList.contains('is-invalid'));
+  type(w, 'rcPass', 'novasenha9'); type(w, 'rcConfirm', 'novasenha9'); submit(w, 'fRecover'); await sleep(900);
+  const code2 = txt(w, '#rcode');
+  ok('recuperação com o código certo mostra um código NOVO', /Senha alterada/.test(txt(w, '#acctBody')) && code2 && code2 !== code, { code2, code });
+  click(w, w.document.getElementById('ackCode')); await sleep(300); ok('depois de guardar, volta ao login', !!w.document.getElementById('fLogin'));
+  type(w, 'lgPhone', '21977771234'); type(w, 'lgPass', 'novasenha9'); submit(w, 'fLogin'); await sleep(900);
+  ok('login com a nova senha', /Olá, Carla/.test(txt(w, '#acctLabel')), txt(w, '#acctLabel'));
 
   /* ===== Painel: Clientes ===== */
   const aj = { c: '' }; const aw = open('public/admin.html', BASE + '/admin', ['public/js/api.js'], aj);
@@ -116,8 +126,7 @@ const txt = (w, sel) => (w.document.querySelector(sel) || { textContent: '' }).t
   aw.exec('csrfToken = null'); ['public/js/br.js', 'public/js/pix.js', 'public/js/admin-neworder.js', 'public/js/admin-core.js', 'public/js/admin-views.js'].forEach((f) => aw.exec(read(f))); await sleep(500);
   aw.location.hash = '#/customers'; await sleep(700);
   ok('tela Clientes lista a cliente com total gasto', /Carla Dias/.test(txt(aw, '#view')) && /\(21\) 97777-1234/.test(txt(aw, '#view')));
-  click(aw, aw.document.querySelector('[data-reset]')); await sleep(500);
-  ok('admin gera link de nova senha do cliente', /\/m\/demo\?reset=/.test((aw.document.querySelector('#lnk') || {}).value || ''));
+  ok('a loja não tem mais botão para gerar senha da conta do cliente', !aw.document.querySelector('[data-reset]') && !/reset-link/.test(read('public/js/admin-views.js').split('VIEWS.customers')[1].split('VIEWS.products')[0]));
   aw.location.hash = '#/orders'; await sleep(700); click(aw, aw.document.querySelector('[data-tab="hist"]')); await sleep(700); click(aw, aw.document.querySelector('[data-det="0"]')); await sleep(500);
   ok('detalhe do pedido tem o link de acompanhamento para a equipe', /Link de acompanhamento/.test(aw.document.body.textContent) && !!aw.document.querySelector('[data-copy*="/pedido/"]'));
 

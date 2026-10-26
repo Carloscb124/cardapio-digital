@@ -11,8 +11,8 @@ function pixHtml(pix, total, opts = {}) {
 }
 
 document.addEventListener('click', async (e) => {
-  const b = e.target.closest('[data-copy-pix]'); if (!b) return;
-  const value = b.dataset.copyPix; let copied = false;
+  const b = e.target.closest('[data-copy-pix],[data-copy-text]'); if (!b) return;
+  const value = b.dataset.copyPix || b.dataset.copyText; let copied = false;
   try { await navigator.clipboard.writeText(value); copied = true; } catch {
     const ta = document.createElement('textarea'); ta.value = value; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
     try { copied = document.execCommand('copy'); } catch { /* sem suporte */ } ta.remove();

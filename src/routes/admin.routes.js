@@ -64,7 +64,6 @@ router.get('/customers', staff, customers.adminList);
 router.post('/customers', staff, customers.adminCreate);
 router.put('/customers/:id', staff, customers.adminUpdate);
 router.delete('/customers/:id', adminOnly, customers.adminRemove);
-router.post('/customers/:id/reset-link', adminOnly, customers.adminReset);
 
 router.get('/stock', adminOnly, admin.stock.list);
 router.post('/stock/adjust', adminOnly, admin.stock.adjust);

@@ -24,11 +24,18 @@ const fail = (e) => { if (e.status === 401) location.href = '/login.html'; else 
 const every = (fn, ms) => { timers.push(setInterval(fn, ms)); };
 
 /* ---------- Formulários ---------- */
+// Opções com "group" viram <optgroup> (ex.: produtos separados por categoria).
+function optionsHtml(options, v) {
+  const groups = {}; options.forEach((o) => (groups[o.group || ''] ||= []).push(o));
+  const one = (o) => `<option value="${esc(o.value)}" ${String(o.value) === String(v ?? '') ? 'selected' : ''}>${esc(o.label)}</option>`;
+  return Object.entries(groups).map(([g, list]) => (g ? `<optgroup label="${esc(g)}">${list.map(one).join('')}</optgroup>` : list.map(one).join(''))).join('');
+}
+
 function rowHtml(cols, d = {}) {
   return `<div class="row g-2 align-items-center mb-2 row-item" data-id="${esc(d.id || '')}">${cols.map((c) => {
     const v = d[c.name]; const w = c.w || 'col';
     if (c.type === 'checkbox') return `<div class="${w}"><label class="small"><input type="checkbox" data-c="${c.name}" ${v ? 'checked' : ''}> ${esc(c.label)}</label></div>`;
-    if (c.type === 'select') return `<div class="${w}"><select class="form-select form-select-sm" data-c="${c.name}">${c.options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(v ?? '') ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></div>`;
+    if (c.type === 'select') return `<div class="${w}"><select class="form-select form-select-sm" data-c="${c.name}">${optionsHtml(c.options, v)}</select></div>`;
     return `<div class="${w}"><input class="form-control form-control-sm" data-c="${c.name}" type="${c.type || 'text'}" ${c.type === 'number' ? 'step="any" min="0"' : ''} placeholder="${esc(c.label)}" value="${esc(v ?? '')}"></div>`;
   }).join('')}<div class="col-auto"><button type="button" class="btn btn-sm btn-outline-danger" data-del-row><i class="bi bi-x"></i></button></div></div>`;
 }
@@ -38,7 +45,7 @@ function fieldHtml(f, v) {
   const lab = `<label class="form-label" for="${id}">${esc(f.label)}</label>`, help = f.help ? `<div class="form-text">${esc(f.help)}</div>` : '';
   switch (f.type) {
     case 'textarea': return `<div class="mb-3">${lab}<textarea class="form-control" id="${id}" rows="3"${req}>${esc(v ?? '')}</textarea>${help}</div>`;
-    case 'select': return `<div class="mb-3">${lab}<select class="form-select" id="${id}"${req}>${f.options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(v ?? '') ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>${help}</div>`;
+    case 'select': return `<div class="mb-3">${lab}<select class="form-select" id="${id}"${req}>${optionsHtml(f.options, v)}</select>${help}</div>`;
     case 'checkbox': return `<div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="${id}" ${v ? 'checked' : ''}><label class="form-check-label" for="${id}">${esc(f.label)}</label>${help}</div>`;
     case 'image': return `<div class="mb-3">${lab}<div class="d-flex gap-2 align-items-center"><img class="thumb ${v ? '' : 'd-none'}" src="${esc(v || '')}" alt=""><input type="file" class="form-control" accept="image/jpeg,image/png,image/webp" data-upload="${id}"><button type="button" class="btn btn-sm btn-outline-danger" data-clear="${id}">Remover</button></div><input type="hidden" id="${id}" value="${esc(v || '')}"><div class="form-text">JPG, PNG ou WebP, até 2 MB.</div></div>`;
     case 'multicheck': return `<div class="mb-3"><label class="form-label">${esc(f.label)}</label><div id="${id}" class="border rounded p-2">${f.options.length ? f.options.map((o) => `<label class="d-block"><input type="checkbox" value="${o.value}" ${(v || []).includes(o.value) ? 'checked' : ''}> ${esc(o.label)}</label>`).join('') : `<span class="text-muted small">${esc(f.empty || 'Nenhuma opção cadastrada.')}</span>`}</div></div>`;
@@ -144,6 +151,7 @@ function route() {
   const id = location.hash.slice(2);
   const v = VIEWS[id] && VIEWS[id].roles.includes(me.role) ? id : Object.keys(VIEWS).find((k) => VIEWS[k].roles.includes(me.role));
   $$('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.v === v));
+  $('#pageTitle').textContent = VIEWS[v].label;
   document.body.classList.remove('sb-open');
   const root = $('#view'); root.innerHTML = '';
   const fresh = root.cloneNode(false); root.replaceWith(fresh); // descarta listeners da tela anterior
@@ -153,8 +161,14 @@ function route() {
 async function boot() {
   try { me = await api('/api/auth/me'); } catch { return (location.href = '/login.html'); }
   $('#estName').textContent = me.establishmentName; $('#userName').textContent = `${me.name} (${me.role})`;
-  $('#nav').innerHTML = Object.entries(VIEWS).filter(([, v]) => v.roles.includes(me.role)).map(([k, v]) =>
-    `<a class="nav-link" data-v="${k}" href="#/${k}"><i class="bi ${v.icon}"></i><span class="txt">${v.label}</span>${k === 'orders' ? '<span id="navbadge" class="badge bg-warning text-dark ms-auto txt d-none"></span>' : ''}</a>`).join('');
+  const GROUPS = { 'Operação': ['dashboard', 'orders', 'customers'], 'Cardápio': ['products', 'categories', 'groups', 'combos', 'coupons'], 'Loja': ['zones', 'stock', 'pix', 'reports', 'users', 'settings'] };
+  const link = (k) => `<a class="nav-link" data-v="${k}" href="#/${k}"><i class="bi ${VIEWS[k].icon}"></i><span class="txt">${VIEWS[k].label}</span>${k === 'orders' ? '<span id="navbadge" class="badge bg-warning text-dark ms-auto txt d-none"></span>' : ''}</a>`;
+  const allowed = (k) => VIEWS[k] && VIEWS[k].roles.includes(me.role);
+  const known = Object.values(GROUPS).flat();
+  $('#nav').innerHTML = [...Object.entries(GROUPS), ['Outros', Object.keys(VIEWS).filter((k) => !known.includes(k))]].map(([g, keys]) => {
+    const ks = keys.filter(allowed);
+    return ks.length ? `<div class="nav-group txt">${g}</div>${ks.map(link).join('')}` : '';
+  }).join('');
   window.addEventListener('hashchange', route); route();
   pollCounts(); setInterval(pollCounts, 15000);
   $('#toggle').onclick = () => document.body.classList.toggle(innerWidth < 768 ? 'sb-open' : 'sb-collapsed');
