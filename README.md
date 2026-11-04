@@ -102,6 +102,13 @@ npm run test:ui-products
 Os testes de cadastro e de cliente aceitam `BASE2` (servidor com `SIGNUP_RATE_LIMIT=3` e `CUSTOMER_RATE_LIMIT=3`) para validar o limite de tentativas. `test:signup` usa `BASE2` (opcional) para testar o limite de tentativas: suba um segundo servidor com `SIGNUP_RATE_LIMIT=3` e `PORT=3998`.
 (use um banco de teste: os testes criam pedidos, usuários e alteram configurações da loja demo.)
 
+## Esqueci a senha do painel (ou "e-mail ou senha incorretos")
+O administrador da loja pode gerar um link de nova senha para outro usuário em **Usuários › chave**. Se você é o único administrador, ou não sabe com qual e-mail criou a conta, use o script de redefinição no seu computador:
+```
+node scripts/reset-password.js .env.production
+```
+(use o arquivo de variáveis que aponta para o **mesmo banco** que a Vercel usa; sem argumento ele lê o `.env`). Ele mostra o banco conectado e **todas as contas existentes** (com o e-mail exato de cada uma), e redefine a senha da conta que você escolher, reativando-a se estiver desativada.
+
 ## Publicar na internet
 Veja **DEPLOY-VERCEL.md** (passo a passo para a Vercel com MySQL na nuvem). Sessões e imagens enviadas ficam no banco, então o sistema funciona em hospedagem sem disco persistente. Use HTTPS e faça backup do banco.
 Variáveis úteis: `DB_SSL`, `DB_SSL_CA`/`DB_SSL_CA_FILE`, `DB_POOL`, `SIGNUP_ENABLED=false` (fecha cadastros), `SESSION_STORE=memory` (só para desenvolvimento).

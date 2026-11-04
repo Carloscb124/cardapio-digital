@@ -80,6 +80,10 @@ main { padding:24px 20px 48px; max-width:1240px; }
 .ocard { border-left:5px solid var(--st, #CBD5C6); } .ocard .num { font-family:var(--display); font-size:1.35rem; }
 .st-aguardando { --st:#E8B931; } .st-confirmado { --st:#3B82C4; } .st-preparo { --st:#1B5239; } .st-pronto { --st:#2E9E5B; } .st-saiu_entrega { --st:#7A5BC4; } .st-concluido { --st:#9DB8A3; } .st-cancelado { --st:#B3392B; }
 
+/* campo de senha com botão "Mostrar" */
+.pw { position:relative; } .pw input { padding-right:92px; }
+.pw button { position:absolute; right:6px; top:50%; transform:translateY(-50%); height:34px; padding:0 12px; border:0; border-radius:8px; background:transparent; color:var(--leaf-2); font-weight:600; }
+
 /* login / redefinição */
 .login-wrap { min-height:100vh; display:grid; place-items:center; padding:16px; background:radial-gradient(1200px 500px at 50% -10%, var(--mint), var(--paper) 60%); }
 .login-card { width:100%; max-width:410px; border:1px solid var(--line); border-radius:22px; background:#fff; box-shadow:0 18px 50px rgba(18,61,43,.10); }
