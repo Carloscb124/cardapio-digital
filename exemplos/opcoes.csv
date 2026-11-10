@@ -1,0 +1,8 @@
+﻿opcao_id,id_externo,etapa_id,produto_referenciado_id,nome,descricao,preco_adicional,custo_adicional,disponivel,ordem_exibicao,quantidade_minima,quantidade_maxima
+opcao_001,orig_op_01,etapa_002,,Bacon,,3.00,1.20,true,1,0,10
+opcao_002,orig_op_02,etapa_002,,Ovo,,2.50,,true,2,0,10
+opcao_003,orig_op_03,etapa_002,,Queijo extra,Mussarela fatiada,3.50,,true,3,0,10
+opcao_004,orig_op_04,etapa_001,prod_003,Refrigerante lata,,5.00,,true,1,0,1
+opcao_005,orig_op_05,etapa_001,prod_004,Batata frita,,10.00,,true,2,0,1
+opcao_006,orig_op_06,etapa_003,,Ao ponto,,0.00,,true,1,,
+opcao_007,orig_op_07,etapa_003,,Bem passado,,0.00,,true,2,,

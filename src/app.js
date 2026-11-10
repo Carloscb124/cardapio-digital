@@ -84,7 +84,8 @@ app.use(express.static(PUBLIC, { extensions: ['html'] }));
 app.use((err, req, res, next) => {
   if (err.status) return res.status(err.status).json({ error: err.message, field: err.field });
   if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Já existe um registro com esse valor.' });
-  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Imagem muito grande (máx. 2 MB).' });
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Arquivo muito grande (máx. 2 MB para imagens e 4 MB por arquivo na importação).' });
+  if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ error: 'Arquivos demais ou campo inesperado (máx. 12 arquivos).' });
   if (err.message === 'FORMATO') return res.status(400).json({ error: 'Formato inválido. Use JPG, PNG ou WebP.' });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Requisição inválida.' });
   console.error(err);

@@ -22,7 +22,7 @@ async function listProducts(est) {
   return rows.map((r) => ({ ...r, group_ids: map[r.id] || [] }));
 }
 
-const PCOLS = ['category_id', 'name', 'description', 'price', 'promo_price', 'image_url', 'available', 'prep_minutes', 'track_stock', 'stock_min', 'sort_order'];
+const PCOLS = ['category_id', 'name', 'description', 'price', 'promo_price', 'image_url', 'available', 'prep_minutes', 'track_stock', 'stock_min', 'sort_order', 'price_from', 'cost', 'show_digital', 'show_tablet', 'redeem_points'];
 
 async function saveProduct(est, id, d, groupIds) {
   if (d.promo_price != null && d.promo_price >= d.price) throw new HttpError(400, 'O preço promocional deve ser menor que o preço.');
@@ -40,17 +40,20 @@ async function saveProduct(est, id, d, groupIds) {
         [est, ...PCOLS.map((c) => d[c])]);
       pid = r.insertId;
     }
-    await conn.query('DELETE FROM product_option_groups WHERE product_id=?', [pid]);
-    for (const g of groups) await conn.query('INSERT INTO product_option_groups (product_id, group_id) VALUES (?,?)', [pid, g]);
+    // Mantém as ligações existentes (e seus ajustes por produto: ordem, mínimo, máximo); só remove e adiciona a diferença.
+    const have = new Set((await conn.query('SELECT group_id FROM product_option_groups WHERE product_id=?', [pid]))[0].map((r) => r.group_id));
+    const drop = [...have].filter((g) => !groups.includes(g));
+    if (drop.length) await conn.query('DELETE FROM product_option_groups WHERE product_id=? AND group_id IN (?)', [pid, drop]);
+    for (const g of groups) if (!have.has(g)) await conn.query('INSERT INTO product_option_groups (product_id, group_id) VALUES (?,?)', [pid, g]);
     return pid;
   });
 }
 
 /* ---------- Grupos de opções ---------- */
 async function listGroups(est) {
-  const [groups] = await db.query('SELECT * FROM option_groups WHERE establishment_id=? ORDER BY name', [est]);
+  const [groups] = await db.query('SELECT * FROM option_groups WHERE establishment_id=? ORDER BY sort_order, name', [est]);
   const [opts] = await db.query(
-    `SELECT o.* FROM options o JOIN option_groups g ON g.id=o.group_id WHERE g.establishment_id=? ORDER BY o.id`, [est]);
+    `SELECT o.* FROM options o JOIN option_groups g ON g.id=o.group_id WHERE g.establishment_id=? ORDER BY o.sort_order, o.id`, [est]);
   return groups.map((g) => ({ ...g, options: opts.filter((o) => o.group_id === g.id) }));
 }
 
@@ -61,12 +64,12 @@ async function saveGroup(est, id, d, rows) {
   return tx(async (conn) => {
     let gid = id;
     if (id) {
-      const [r] = await conn.query('UPDATE option_groups SET name=?, min_select=?, max_select=? WHERE establishment_id=? AND id=?',
-        [d.name, d.min_select, d.max_select, est, id]);
+      const [r] = await conn.query('UPDATE option_groups SET name=?, min_select=?, max_select=?, available=? WHERE establishment_id=? AND id=?',
+        [d.name, d.min_select, d.max_select, d.available, est, id]);
       if (!r.affectedRows) throw new HttpError(404, 'Grupo não encontrado.');
     } else {
-      const [r] = await conn.query('INSERT INTO option_groups (establishment_id,name,min_select,max_select) VALUES (?,?,?,?)',
-        [est, d.name, d.min_select, d.max_select]);
+      const [r] = await conn.query('INSERT INTO option_groups (establishment_id,name,min_select,max_select,available) VALUES (?,?,?,?,?)',
+        [est, d.name, d.min_select, d.max_select, d.available]);
       gid = r.insertId;
     }
     const [existing] = await conn.query('SELECT id FROM options WHERE group_id=?', [gid]);

@@ -6,6 +6,7 @@ const makeController = require('../controllers/crud.controller');
 const catalog = require('../controllers/catalog.controller');
 const admin = require('../controllers/admin.controller');
 const customers = require('../controllers/customer.controller');
+const io = require('../controllers/catalog-io.controller');
 const { upload } = require('../config/upload');
 const { HttpError } = require('../utils/http');
 
@@ -64,6 +65,12 @@ router.get('/customers', staff, customers.adminList);
 router.post('/customers', staff, customers.adminCreate);
 router.put('/customers/:id', staff, customers.adminUpdate);
 router.delete('/customers/:id', adminOnly, customers.adminRemove);
+
+router.get('/io/export', adminOnly, io.export);
+router.get('/io/modelo', adminOnly, io.example);
+router.post('/io/import', adminOnly, io.upload, io.import);
+router.get('/io/runs', adminOnly, io.runs);
+router.get('/ingredients', adminOnly, io.ingredients);
 
 router.get('/stock', adminOnly, admin.stock.list);
 router.post('/stock/adjust', adminOnly, admin.stock.adjust);

@@ -32,19 +32,19 @@ async function getMenu(slug) {
   const e = await getEst(slug);
   const [cats] = await db.query('SELECT id,name FROM categories WHERE establishment_id=? AND active=1 ORDER BY sort_order,name', [e.id]);
   const [prods] = await db.query(
-    `SELECT id,category_id,name,description,price,promo_price,image_url,prep_minutes,track_stock,stock_qty
-       FROM products WHERE establishment_id=? AND available=1 ORDER BY sort_order,name`, [e.id]);
-  const [links] = await db.query('SELECT l.product_id,l.group_id FROM product_option_groups l JOIN products p ON p.id=l.product_id WHERE p.establishment_id=?', [e.id]);
+    `SELECT id,category_id,name,description,price,promo_price,price_from,image_url,prep_minutes,track_stock,stock_qty
+       FROM products WHERE establishment_id=? AND available=1 AND show_digital=1 ORDER BY sort_order,name`, [e.id]);
+  const [links] = await db.query('SELECT l.product_id,l.group_id,l.sort_order,l.min_select,l.max_select,l.available FROM product_option_groups l JOIN products p ON p.id=l.product_id WHERE p.establishment_id=?', [e.id]);
   const groups = await catalog.listGroups(e.id);
-  const shape = (g) => ({
-    id: g.id, name: g.name, min: g.min_select, max: g.max_select,
+  const shape = (g, l) => ({
+    id: g.id, name: g.name, min: l.min_select ?? g.min_select, max: l.max_select ?? g.max_select,
     options: g.options.filter((o) => o.available).map((o) => ({ id: o.id, name: o.name, price_delta: o.price_delta, soldOut: !!o.track_stock && o.stock_qty <= 0 })),
   });
   const products = prods.map((p) => ({
-    id: p.id, category_id: p.category_id, name: p.name, description: p.description, price: p.price,
+    id: p.id, category_id: p.category_id, name: p.name, description: p.description, price: p.price, price_from: p.price_from,
     promo_price: p.promo_price != null && p.promo_price < p.price ? p.promo_price : null,
     image_url: p.image_url, prep_minutes: p.prep_minutes, soldOut: !!p.track_stock && p.stock_qty <= 0,
-    groups: links.filter((l) => l.product_id === p.id).map((l) => groups.find((g) => g.id === l.group_id)).filter(Boolean).map(shape),
+    groups: links.filter((l) => l.product_id === p.id && l.available).sort((a, b) => a.sort_order - b.sort_order).map((l) => ({ l, g: groups.find((x) => x.id === l.group_id) })).filter((x) => x.g && x.g.available).map((x) => shape(x.g, x.l)),
   }));
   const categories = cats.map((c) => ({ ...c, products: products.filter((p) => p.category_id === c.id) }));
   const loose = products.filter((p) => !cats.some((c) => c.id === p.category_id));
@@ -137,10 +137,10 @@ async function createOrderTx(slug, b, accountId = null, opts = {}) {
         subtotal += c.price * qty;
         continue;
       }
-      const [[p]] = await conn.query('SELECT * FROM products WHERE id=? AND establishment_id=? AND available=1', [Number(it.id), e.id]);
+      const [[p]] = await conn.query('SELECT * FROM products WHERE id=? AND establishment_id=? AND available=1' + (staff ? '' : ' AND show_digital=1'), [Number(it.id), e.id]);
       if (!p) throw new HttpError(400, 'Um produto do carrinho não está mais disponível.');
       const unit = p.promo_price != null && p.promo_price < p.price ? p.promo_price : p.price;
-      const [gs] = await conn.query('SELECT g.* FROM option_groups g JOIN product_option_groups l ON l.group_id=g.id WHERE l.product_id=?', [p.id]);
+      const [gs] = await conn.query('SELECT g.id, g.name, COALESCE(l.min_select, g.min_select) AS min_select, COALESCE(l.max_select, g.max_select) AS max_select FROM option_groups g JOIN product_option_groups l ON l.group_id=g.id WHERE l.product_id=? AND g.available=1 AND l.available=1', [p.id]);
       const chosen = [...new Set((Array.isArray(it.options) ? it.options : []).map(Number))];
       const opts = chosen.length ? (await conn.query('SELECT * FROM options WHERE id IN (?)', [chosen]))[0] : [];
       if (opts.length !== chosen.length || opts.some((o) => !o.available || !gs.some((g) => g.id === o.group_id))) throw new HttpError(400, `Opção inválida em "${p.name}".`);

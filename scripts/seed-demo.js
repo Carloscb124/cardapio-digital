@@ -29,7 +29,7 @@ const db = require('../src/config/db');
     for (const [n, p] of [['Bacon', 4], ['Ovo', 3], ['Queijo extra', 3.5]]) await conn.query('INSERT INTO options (group_id,name,price_delta) VALUES (?,?,?)', [g.insertId, n, p]);
     const [t] = await conn.query('INSERT INTO option_groups (establishment_id,name,min_select,max_select) VALUES (?,?,1,1)', [est, 'Ponto da carne']);
     for (const n of ['Ao ponto', 'Bem passado']) await conn.query('INSERT INTO options (group_id,name,price_delta) VALUES (?,?,0)', [t.insertId, n]);
-    await conn.query('INSERT INTO product_option_groups VALUES (?,?),(?,?),(?,?)', [burger, g.insertId, burger, t.insertId, chicken, g.insertId]);
+    await conn.query('INSERT INTO product_option_groups (product_id, group_id) VALUES (?,?),(?,?),(?,?)', [burger, g.insertId, burger, t.insertId, chicken, g.insertId]);
     const [cb] = await conn.query('INSERT INTO combos (establishment_id,name,description,price) VALUES (?,?,?,?)', [est, 'X-Burger + Refri', 'Um X-Burger e um refrigerante', 26]);
     await conn.query('INSERT INTO combo_items VALUES (?,?,1),(?,?,1)', [cb.insertId, burger, cb.insertId, refri]);
     await conn.query("INSERT INTO delivery_zones (establishment_id,neighborhood,fee) VALUES (?, 'Centro', 5), (?, 'Jardim das Flores', 8)", [est, est]);

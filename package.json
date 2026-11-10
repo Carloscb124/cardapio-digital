@@ -22,13 +22,22 @@
     "test:ui-products": "node test/ui-products.js",
     "reset-password": "node scripts/reset-password.js",
     "test:login": "node test/login.js",
-    "test:ui-login": "node test/ui-login.js"
+    "test:ui-login": "node test/ui-login.js",
+    "test:csv": "node test/csvio.js",
+    "test:io": "node test/catalog-io.js",
+    "test:io2": "node test/catalog-io2.js",
+    "test:ui-io": "node test/ui-io.js",
+    "test:migrate": "node test/migrate-006.js",
+    "build:examples": "node scripts/build-examples.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.3",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0",
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
@@ -36,6 +45,7 @@
     "helmet": "^8.3.0",
     "multer": "^2.4.0",
     "mysql2": "^3.24.6",
+    "pngjs": "^7.0.0",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {

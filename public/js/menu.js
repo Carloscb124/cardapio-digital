@@ -30,7 +30,7 @@ function renderHead() {
 }
 
 function prodCard(p) {
-  const price = p.promo_price != null ? `<span class="old">${money(p.price)}</span>${money(p.promo_price)}` : money(p.price);
+  const price = p.price_from != null ? `<span class="old" style="text-decoration:none">a partir de</span> ${money(p.price_from)}` : p.promo_price != null ? `<span class="old">${money(p.price)}</span>${money(p.promo_price)}` : money(p.price);
   return `<div class="prod ${p.soldOut ? 'off' : ''}" data-p="${p.id}">
     <div class="flex-grow-1"><div class="name">${esc(p.name)}</div><div class="desc">${esc(p.description)}</div>
     <div class="foot"><span class="price">${price} ${p.soldOut ? '<span class="badge bg-secondary">Esgotado</span>' : ''}</span>${p.soldOut ? '' : '<span class="add" aria-hidden="true"><i class="bi bi-plus-lg"></i></span>'}</div></div>

@@ -13,6 +13,13 @@ async function api(path, { method = 'GET', body } = {}) {
   if (!res.ok) { const e = new Error(data.error || 'Erro inesperado.'); e.status = res.status; e.field = data.field; throw e; }
   return data;
 }
+// Envio de formulário com arquivos (importação). Respostas 4xx/5xx viram erro com a mensagem do servidor.
+async function apiForm(path, formData) {
+  const res = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'x-csrf-token': await getCsrf() }, body: formData });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || 'Erro inesperado.'); e.status = res.status; throw e; }
+  return data;
+}
 async function apiUpload(file) {
   const fd = new FormData(); fd.append('image', file);
   const res = await fetch('/api/uploads', { method: 'POST', credentials: 'same-origin', headers: { 'x-csrf-token': await getCsrf() }, body: fd });

@@ -55,6 +55,9 @@ Os produtos aparecem **agrupados por categoria**, com contagem, filtro por categ
 ## Visual
 Painel, cardápio, acompanhamento e login usam o mesmo sistema visual da landing (Bricolage Grotesque + Figtree, verde-folha e mostarda como único acento). Menu do painel em grupos (Operação, Cardápio, Loja); cartões de pedido com borda colorida pela situação; no cardápio, categorias fixas no topo com destaque da categoria visível.
 
+## Importação e exportação de cardápio (CSV)
+Em **Cardápio › Importar e exportar**: exporte o catálogo (inteiro ou por categoria, com estoque e imagens opcionais) em um ZIP de CSVs com manifesto, ou importe CSVs/ZIP de outra plataforma com **análise prévia (simulação)**, erros por arquivo/linha/coluna, escolha entre inserir/atualizar, tratamento de duplicidades, gravação **tudo ou nada** e histórico. Reimportar não duplica (vínculos por `id_externo`) e nada é apagado. Inclui insumos e ficha técnica (o saldo físico só é definido na criação do insumo). Guia completo, formato dos arquivos e o que é confirmado, proposto ou pendente: **docs/IMPORTACAO-EXPORTACAO.md**; exemplos em `exemplos/`.
+
 ## Perfis
 | Perfil | Acesso |
 |---|---|

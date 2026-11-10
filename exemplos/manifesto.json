@@ -1,0 +1,58 @@
+{
+  "formato": "cardapio-csv",
+  "versao": "1.0",
+  "exportado_em": "2026-01-01T00:00:00.000Z",
+  "sistema_origem": "exemplo",
+  "loja": {
+    "nome": "Lanchonete Exemplo",
+    "slug": "exemplo"
+  },
+  "escopo": {
+    "tipo": "tudo",
+    "categorias": []
+  },
+  "inclui_estoque": true,
+  "inclui_imagens": true,
+  "imagens": 1,
+  "arquivos": [
+    {
+      "nome": "categorias.csv",
+      "registros": 3
+    },
+    {
+      "nome": "estoque.csv",
+      "registros": 3
+    },
+    {
+      "nome": "etapas.csv",
+      "registros": 3
+    },
+    {
+      "nome": "produtos.csv",
+      "registros": 5
+    },
+    {
+      "nome": "opcoes.csv",
+      "registros": 7
+    },
+    {
+      "nome": "produto_etapas.csv",
+      "registros": 4
+    },
+    {
+      "nome": "disponibilidade.csv",
+      "registros": 11
+    },
+    {
+      "nome": "ficha_tecnica.csv",
+      "registros": 3
+    },
+    {
+      "nome": "imagens.csv",
+      "registros": 1
+    }
+  ],
+  "avisos": [
+    "Pacote de exemplo com dados fictícios."
+  ]
+}

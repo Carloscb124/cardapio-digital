@@ -121,15 +121,15 @@ async function reorder(est, accountId, orderId) {
       if (c) lines.push({ kind: 'combo', id: c.id, name: `Combo: ${c.name}`, unit: c.price, qty: it.quantity, options: [], notes: it.notes || '' }); else skipped++;
       continue;
     }
-    const [[p]] = it.product_id ? await db.query('SELECT * FROM products WHERE id=? AND establishment_id=? AND available=1', [it.product_id, est]) : [[]];
+    const [[p]] = it.product_id ? await db.query('SELECT * FROM products WHERE id=? AND establishment_id=? AND available=1 AND show_digital=1', [it.product_id, est]) : [[]];
     if (!p || (p.track_stock && p.stock_qty < it.quantity)) { skipped++; continue; }
     const [saved] = await db.query('SELECT option_id FROM order_item_options WHERE order_item_id=?', [it.id]);
     const ids = saved.map((s) => s.option_id).filter(Boolean);
     let opts = [];
     if (ids.length) {
       [opts] = await db.query(
-        `SELECT op.id, op.name, op.price_delta FROM options op JOIN product_option_groups l ON l.group_id=op.group_id
-          WHERE l.product_id=? AND op.available=1 AND (op.track_stock=0 OR op.stock_qty>=?) AND op.id IN (?)`, [p.id, it.quantity, ids]);
+        `SELECT op.id, op.name, op.price_delta FROM options op JOIN product_option_groups l ON l.group_id=op.group_id JOIN option_groups g ON g.id=op.group_id
+          WHERE l.product_id=? AND l.available=1 AND g.available=1 AND op.available=1 AND (op.track_stock=0 OR op.stock_qty>=?) AND op.id IN (?)`, [p.id, it.quantity, ids]);
     }
     if (opts.length !== saved.length) { skipped++; continue; }
     lines.push({ kind: 'product', id: p.id, name: p.name, unit: p.promo_price != null && p.promo_price < p.price ? p.promo_price : p.price, qty: it.quantity, options: opts, notes: it.notes || '' });

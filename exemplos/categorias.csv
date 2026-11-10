@@ -1,0 +1,4 @@
+﻿categoria_id,id_externo,nome,descricao,ordem_exibicao,disponivel
+cat_001,orig_cat_01,Lanches,Lanches da casa,1,true
+cat_002,orig_cat_02,Bebidas,,2,true
+cat_003,orig_cat_03,Porções,,3,true

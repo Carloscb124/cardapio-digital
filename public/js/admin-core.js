@@ -149,7 +149,8 @@ const VIEWS = {};
 function route() {
   timers.forEach(clearInterval); timers = [];
   const id = location.hash.slice(2);
-  const v = VIEWS[id] && VIEWS[id].roles.includes(me.role) ? id : Object.keys(VIEWS).find((k) => VIEWS[k].roles.includes(me.role));
+  const allowed = (k) => VIEWS[k] && VIEWS[k].roles.includes(me.role);
+  const v = allowed(id) ? id : ['dashboard', 'orders'].find(allowed) || Object.keys(VIEWS).find(allowed);
   $$('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.v === v));
   $('#pageTitle').textContent = VIEWS[v].label;
   document.body.classList.remove('sb-open');
@@ -161,7 +162,7 @@ function route() {
 async function boot() {
   try { me = await api('/api/auth/me'); } catch { return (location.href = '/login.html'); }
   $('#estName').textContent = me.establishmentName; $('#userName').textContent = `${me.name} (${me.role})`;
-  const GROUPS = { 'Operação': ['dashboard', 'orders', 'customers'], 'Cardápio': ['products', 'categories', 'groups', 'combos', 'coupons'], 'Loja': ['zones', 'stock', 'pix', 'reports', 'users', 'settings'] };
+  const GROUPS = { 'Operação': ['dashboard', 'orders', 'customers'], 'Cardápio': ['products', 'categories', 'groups', 'combos', 'coupons', 'io'], 'Loja': ['zones', 'stock', 'pix', 'reports', 'users', 'settings'] };
   const link = (k) => `<a class="nav-link" data-v="${k}" href="#/${k}"><i class="bi ${VIEWS[k].icon}"></i><span class="txt">${VIEWS[k].label}</span>${k === 'orders' ? '<span id="navbadge" class="badge bg-warning text-dark ms-auto txt d-none"></span>' : ''}</a>`;
   const allowed = (k) => VIEWS[k] && VIEWS[k].roles.includes(me.role);
   const known = Object.values(GROUPS).flat();

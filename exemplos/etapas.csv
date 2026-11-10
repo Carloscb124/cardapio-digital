@@ -1,0 +1,4 @@
+﻿etapa_id,id_externo,nome,quantidade_minima,quantidade_maxima,tipo_selecao,obrigatoria,ordem_exibicao,disponivel
+etapa_001,orig_etapa_01,Transforme seu pedido em combo,0,10,multipla,false,1,true
+etapa_002,orig_etapa_02,Adicionais,0,10,multipla,false,2,true
+etapa_003,orig_etapa_03,Ponto da carne,1,1,unica,true,3,true

@@ -1,0 +1,4 @@
+﻿produto_id,insumo_id,quantidade_por_unidade,unidade_medida,perda_percentual,observacao
+prod_002,insumo_001,1,unidade,0,
+prod_002,insumo_002,150,g,5,Exemplo ilustrativo: não representa uma receita real
+prod_001,insumo_003,0.05,kg,0,

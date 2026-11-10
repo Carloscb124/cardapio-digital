@@ -1,0 +1,4 @@
+﻿insumo_id,id_externo,nome,categoria_insumo,unidade_medida,quantidade_estoque,estoque_minimo,custo_unitario,disponivel
+insumo_001,,Pão de hambúrguer,Padaria,unidade,40,10,0.9,true
+insumo_002,,Carne moída,Açougue,kg,12.5,3,38,true
+insumo_003,,Queijo mussarela,Frios,kg,8,2,42,true

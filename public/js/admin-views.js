@@ -132,6 +132,10 @@ async function productFields() {
     { name: 'stock_min', label: 'Estoque mínimo (alerta)', type: 'number' },
     { name: 'group_ids', label: 'Grupos de opções e adicionais', type: 'multicheck', options: opt(groups), empty: 'Cadastre grupos na tela "Adicionais".' },
     { name: 'sort_order', label: 'Ordem de exibição', type: 'number' },
+    { name: 'price_from', label: 'Preço "a partir de" (R$)', type: 'number', help: 'Opcional: no cardápio aparece "a partir de R$ ..." no lugar do preço.' },
+    { name: 'cost', label: 'Custo do produto (R$)', type: 'number', help: 'Só para você: não aparece para o cliente.' },
+    { name: 'show_digital', label: 'Exibir no cardápio digital', type: 'checkbox' }, { name: 'show_tablet', label: 'Exibir no tablet', type: 'checkbox' },
+    { name: 'redeem_points', label: 'Permite troca por pontos', type: 'checkbox' },
   ];
 }
 
@@ -190,16 +194,16 @@ VIEWS.products = { label: 'Produtos', icon: 'bi-basket', roles: ALL, async rende
 VIEWS.categories = { label: 'Categorias', icon: 'bi-tags', roles: ALL, render: crudView({
   title: 'Categorias', icon: 'bi-tags', endpoint: '/api/categories', blank: { active: true, sort_order: 0 },
   columns: [{ label: 'Nome', key: 'name' }, { label: 'Ordem', key: 'sort_order' }, { label: 'Ativa', render: (r) => yesno(r.active) }],
-  fields: [{ name: 'name', label: 'Nome', req: true, maxlength: 80 }, { name: 'sort_order', label: 'Ordem de exibição', type: 'number' }, { name: 'active', label: 'Ativa', type: 'checkbox' }],
+  fields: [{ name: 'name', label: 'Nome', req: true, maxlength: 80 }, { name: 'description', label: 'Descrição', maxlength: 255 }, { name: 'sort_order', label: 'Ordem de exibição', type: 'number' }, { name: 'active', label: 'Ativa', type: 'checkbox' }],
 }) };
 
 VIEWS.groups = { label: 'Adicionais', icon: 'bi-plus-square', roles: ALL, render: crudView({
-  title: 'Adicionais e opções', icon: 'bi-plus-square', endpoint: '/api/option-groups', wide: true, blank: { min_select: 0, max_select: 1, options: [{ available: true }] },
+  title: 'Adicionais e opções', icon: 'bi-plus-square', endpoint: '/api/option-groups', wide: true, blank: { min_select: 0, max_select: 1, available: true, options: [{ available: true }] },
   intro: 'Crie grupos como "Tamanho", "Sabor" ou "Adicionais" e vincule-os aos produtos.',
   columns: [{ label: 'Grupo', key: 'name' }, { label: 'Escolha', render: (r) => `${r.min_select} a ${r.max_select}` }, { label: 'Opções', render: (r) => esc(r.options.map((o) => o.name).join(', ')) }],
   fields: [
     { name: 'name', label: 'Nome do grupo', req: true, maxlength: 80 },
-    { name: 'min_select', label: 'Mínimo de escolhas (0 = opcional)', type: 'number' }, { name: 'max_select', label: 'Máximo de escolhas', type: 'number', req: true },
+    { name: 'min_select', label: 'Mínimo de escolhas (0 = opcional)', type: 'number' }, { name: 'max_select', label: 'Máximo de escolhas', type: 'number', req: true }, { name: 'available', label: 'Disponível', type: 'checkbox' },
     { name: 'options', label: 'Opções', type: 'rows', newRow: { available: true }, cols: [{ name: 'name', label: 'Nome', w: 'col-12 col-md-4' }, { name: 'price_delta', label: 'Preço +', type: 'number', w: 'col-5 col-md-2' }, { name: 'available', label: 'Disponível', type: 'checkbox', w: 'col-auto' }, { name: 'track_stock', label: 'Estoque', type: 'checkbox', w: 'col-auto' }] },
   ],
 }) };
@@ -243,14 +247,15 @@ VIEWS.zones = { label: 'Entrega', icon: 'bi-bicycle', roles: ALL, render: crudVi
 
 /* ---------- Estoque ---------- */
 VIEWS.stock = { label: 'Estoque', icon: 'bi-box-seam', roles: ALL, async render(root) {
-  root.innerHTML = '<h1 class="h4 mb-3"><i class="bi bi-box-seam"></i> Estoque</h1><div id="low"></div><div class="panel table-responsive mb-3" id="items">Carregando...</div><h2 class="h6">Histórico de movimentações</h2><div class="panel table-responsive" id="moves"></div>';
+  root.innerHTML = '<h1 class="h4 mb-3"><i class="bi bi-box-seam"></i> Estoque</h1><div id="low"></div><div class="panel table-responsive mb-3" id="items">Carregando...</div><h2 class="h6">Insumos (matéria-prima)</h2><div class="panel table-responsive mb-3" id="ingr"></div><h2 class="h6">Histórico de movimentações</h2><div class="panel table-responsive" id="moves"></div>';
   let items = [];
   const load = async () => {
     try {
-      let moves; [items, moves] = await Promise.all([api('/api/stock'), api('/api/stock/movements')]);
+      let moves, ingr; [items, moves, ingr] = await Promise.all([api('/api/stock'), api('/api/stock/movements'), api('/api/ingredients')]);
       const low = items.filter((i) => i.low);
       $('#low').innerHTML = low.length ? `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Estoque baixo: ${low.map((i) => esc(i.name)).join(', ')}</div>` : '';
       $('#items').innerHTML = items.length ? `<table class="table align-middle mb-0"><thead><tr><th>Item</th><th>Categoria</th><th>Quantidade</th><th>Mínimo</th><th></th><th></th></tr></thead><tbody>${items.map((i, n) => `<tr><td>${esc(i.name)}</td><td class="text-muted">${esc(i.category)}</td><td>${i.qty}</td><td>${i.min || '—'}</td><td>${i.qty <= 0 ? '<span class="badge bg-danger">Esgotado</span>' : i.low ? '<span class="badge bg-warning text-dark">Baixo</span>' : '<span class="badge bg-success">OK</span>'}</td><td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-adj="${n}">Lançar entrada/saída</button></td></tr>`).join('')}</tbody></table>` : '<div class="text-muted">Nenhum item com controle de estoque. Ative "Controlar estoque" no cadastro do produto ou da opção.</div>';
+      $('#ingr').innerHTML = ingr.length ? `<table class="table align-middle mb-0"><thead><tr><th>Insumo</th><th>Categoria</th><th>Saldo</th><th>Mínimo</th><th>Custo unitário</th><th></th></tr></thead><tbody>${ingr.map((i) => `<tr><td>${esc(i.name)}</td><td class="text-muted">${esc(i.category || '—')}</td><td>${Number(i.stock_qty)} ${esc(i.unit)}</td><td>${Number(i.stock_min) || '—'}</td><td>${i.unit_cost == null ? '—' : money(i.unit_cost) + ' / ' + esc(i.unit)}</td><td>${!i.available ? '<span class="badge bg-secondary">Indisponível</span>' : i.low ? '<span class="badge bg-warning text-dark">Baixo</span>' : ''}</td></tr>`).join('')}</tbody></table><div class="small text-muted mt-2">Insumos e fichas técnicas entram por <a href="#/io">Importar e exportar</a>. O consumo automático dos insumos nos pedidos é uma etapa futura.</div>` : '<div class="text-muted">Nenhum insumo cadastrado. Importe um <code>estoque.csv</code> em <a href="#/io">Importar e exportar</a>.</div>';
       $('#moves').innerHTML = moves.length ? `<table class="table table-sm mb-0"><thead><tr><th>Data</th><th>Item</th><th>Variação</th><th>Motivo</th></tr></thead><tbody>${moves.map((m) => `<tr><td>${dt(m.created_at)}</td><td>${esc(m.item)}</td><td class="${m.delta > 0 ? 'text-success' : 'text-danger'}">${m.delta > 0 ? '+' : ''}${m.delta}</td><td>${esc(m.reason)}</td></tr>`).join('')}</tbody></table>` : '<div class="text-muted">Sem movimentações.</div>';
     } catch (e) { fail(e); }
   };

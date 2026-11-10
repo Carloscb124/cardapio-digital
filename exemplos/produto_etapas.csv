@@ -1,0 +1,5 @@
+﻿produto_id,etapa_id,ordem_exibicao,quantidade_minima,quantidade_maxima,disponivel
+prod_001,etapa_001,1,0,10,true
+prod_001,etapa_002,2,0,10,true
+prod_002,etapa_003,1,1,1,true
+prod_002,etapa_002,2,0,3,true

@@ -1,0 +1,7 @@
+﻿produto_id,id_externo,nome,categoria_id,descricao,preco,preco_antigo,preco_a_partir_de,custo,disponivel,exibir_cardapio_digital,exibir_tablet,troca_por_pontos,imagem_arquivo,tipo_venda,ordem_exibicao,tipo_disponibilidade
+prod_001,orig_123,Misto Quente,cat_001,"Mussarela, Cheddar, Presunto, Catchup. Maionese da Casa",17.00,,,,true,true,true,false,,unitaria,1,sempre
+prod_002,orig_124,"X-Burger ""Especial""",cat_001,"Pão, hambúrguer 150 g, queijo e salada.
+Servido com molho da casa, ao gosto.",22.00,24.00,,9.50,true,true,true,false,,unitaria,2,sempre
+prod_003,orig_125,Refrigerante lata,cat_002,350 ml,6.00,,,2.80,true,true,true,true,refrigerante.png,unitaria,1,sempre
+prod_004,orig_126,Batata frita,cat_003,"Porção de 300 g, crocante",18.90,,18.90,,true,true,false,false,,unitaria,1,agendada
+prod_005,orig_127,Suco de laranja,cat_002,"Natural, sem açúcar",8.00,,,,false,true,true,false,,unitaria,2,sempre

@@ -1,6 +1,7 @@
 module.exports = {
   categories: [
     { name: 'name', label: 'Nome', type: 'str', req: true, max: 80 },
+    { name: 'description', label: 'Descrição', type: 'str', max: 255 },
     { name: 'sort_order', label: 'Ordem', type: 'int', def: 0 },
     { name: 'active', type: 'bool', def: 1 },
   ],
@@ -31,11 +32,17 @@ module.exports = {
     { name: 'track_stock', type: 'bool', def: 0 },
     { name: 'stock_min', label: 'Estoque mínimo', type: 'int', def: 0 },
     { name: 'sort_order', label: 'Ordem', type: 'int', def: 0 },
+    { name: 'price_from', label: 'Preço a partir de', type: 'dec' },
+    { name: 'cost', label: 'Custo', type: 'dec' },
+    { name: 'show_digital', type: 'bool', def: 1 },
+    { name: 'show_tablet', type: 'bool', def: 1 },
+    { name: 'redeem_points', type: 'bool', def: 0 },
   ],
   option_groups: [
     { name: 'name', label: 'Nome do grupo', type: 'str', req: true, max: 80 },
     { name: 'min_select', label: 'Mínimo', type: 'int', def: 0 },
     { name: 'max_select', label: 'Máximo', type: 'int', min: 1, def: 1 },
+    { name: 'available', type: 'bool', def: 1 },
   ],
   options: [
     { name: 'name', label: 'Nome da opção', type: 'str', req: true, max: 80 },
